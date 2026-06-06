@@ -1,36 +1,42 @@
 <main class="shell">
-  <section class="card">
-    <p class="eyebrow">Connection Test Boilerplate</p>
-    <h1>Angular Frontend is running successfully!</h1>
-    <p class="lead">
-      This screen confirms the Angular app is live and can reach FastAPI, which in turn
-      queries PostgreSQL.
-    </p>
+  <header class="topbar">
+    <div class="brand">
+      <div class="crest" aria-hidden="true"></div>
+      <div class="brand-copy">
+        <span class="brand-eyebrow">Hong Kong Government</span>
+        <strong>Policy Input Tool</strong>
+      </div>
+    </div>
+  </header>
 
-    <div class="service-grid">
-      <article class="service-pill">
-        <span class="service-label">Frontend</span>
-        <strong>Angular</strong>
-      </article>
-      <article class="service-pill">
-        <span class="service-label">Backend</span>
-        <strong>FastAPI</strong>
-      </article>
-      <article class="service-pill">
-        <span class="service-label">Database</span>
-        <strong>PostgreSQL</strong>
-      </article>
+  <section class="workspace">
+    <div class="intro">
+      <p class="eyebrow">Policy Workspace</p>
+      <h1>Include your policy.</h1>
+      <p class="lead">
+        Paste or draft the policy text below for structured review.
+      </p>
     </div>
 
-    <section class="response-panel">
-      <p class="response-label">Database Message via FastAPI</p>
+    <section class="panel">
+      <label class="sr-only" for="policy-input">Policy input</label>
+      <textarea
+        id="policy-input"
+        [ngModel]="briefInput()"
+        (ngModelChange)="onInputChange($event)"
+        placeholder="Include your policy..."
+      ></textarea>
 
-      @if (isLoading()) {
-        <p class="status-text">Loading message from the backend...</p>
-      } @else if (errorMessage()) {
-        <p class="status-text error">{{ errorMessage() }}</p>
-      } @else {
-        <p class="status-text success">{{ databaseMessage() }}</p>
+      <div class="actions">
+        <span class="key-hint">Press Enter after review</span>
+        <div class="button-group">
+          <button type="button" class="button button-secondary" (click)="clearInput()">Clear</button>
+          <button type="button" class="button button-primary" (click)="submitPolicy()">Submit</button>
+        </div>
+      </div>
+
+      @if (submittedState() === 'submitted') {
+        <p class="status">Policy text prepared for submission.</p>
       }
     </section>
   </section>

@@ -1,12 +1,30 @@
-# Angular + FastAPI + PostgreSQL Boilerplate
+# Housing Policy Loop Navigator
 
-This repository is a production-oriented connection-test starter that verifies end-to-end communication across:
+Housing Policy Loop Navigator is a hackathon-ready B2G demo for city housing teams. It helps a policy analyst test a housing intervention, trace stakeholder and system loops, identify failure paths, and review safer intervention points before a policy is launched.
 
-- Angular frontend
-- FastAPI backend
-- PostgreSQL database
+The stack is:
 
-The backend seeds a `system_status` table on startup with `Hello from the PostgreSQL Database!`. The Angular app calls `/api/status` through Nginx and renders the database message in the browser.
+- Angular frontend for the analyst dashboard
+- FastAPI backend for seeded scenario loading, simulation, and intervention ranking
+- PostgreSQL for the seeded city model and simulation runs
+
+## What the demo does
+
+- Loads a seeded city called `Harborview`
+- Visualizes a causal housing-policy graph with stakeholder, factor, and policy nodes
+- Highlights reinforcing loops that make policy fail
+- Simulates housing policy changes with deterministic scoring
+- Ranks intervention options with explainable tradeoffs
+- Shows a light neighborhood map for contextual impact
+
+## API surface
+
+- `GET /api/scenarios/default`
+- `GET /api/graph`
+- `GET /api/neighborhoods`
+- `POST /api/simulate-policy`
+- `POST /api/recommend-interventions`
+- `GET /healthz`
 
 ## Project structure
 
@@ -14,64 +32,72 @@ The backend seeds a `system_status` table on startup with `Hello from the Postgr
 .
 ├── backend
 │   ├── app
-│   │   ├── __init__.py
+│   │   ├── advisor.py
 │   │   ├── config.py
 │   │   ├── database.py
 │   │   ├── main.py
-│   │   └── schemas.py
+│   │   ├── repository.py
+│   │   ├── schemas.py
+│   │   ├── seed_data.py
+│   │   └── simulation.py
 │   ├── Dockerfile
 │   └── requirements.txt
 ├── frontend
 │   ├── nginx
 │   │   └── default.conf.template
-│   ├── public
 │   ├── src
 │   │   ├── app
-│   │   │   ├── app.config.ts
 │   │   │   ├── app.css
 │   │   │   ├── app.html
-│   │   │   ├── app.routes.ts
 │   │   │   ├── app.spec.ts
 │   │   │   ├── app.ts
-│   │   │   └── status.service.ts
+│   │   │   ├── policy-navigator.service.ts
+│   │   │   └── policy-navigator.types.ts
 │   │   ├── index.html
 │   │   ├── main.ts
 │   │   └── styles.css
 │   ├── Dockerfile
 │   ├── angular.json
 │   └── package.json
-├── .dockerignore
+├── understand.md
 ├── .env
 ├── .env.example
-├── docker-compose.yml
-└── README.md
+└── docker-compose.yml
 ```
 
-## Run with Docker Compose
+## Run locally with Docker Compose
 
-1. Copy the environment template if you want to customize values:
+```bash
+cp .env.example .env
+docker compose up --build
+```
 
-   ```bash
-   cp .env.example .env
-   ```
+Open:
 
-2. Build and start the full stack:
-
-   ```bash
-   docker compose up --build
-   ```
-
-3. Open the services:
-
-   - Frontend: http://localhost:4200
-   - Backend: http://localhost:8000/api/status
-   - Backend health check: http://localhost:8000/healthz
+- Frontend: [http://localhost:4200](http://localhost:4200)
+- API docs: [http://localhost:8000/docs](http://localhost:8000/docs)
+- Health check: [http://localhost:8000/healthz](http://localhost:8000/healthz)
 
 ## Useful commands
 
 ```bash
 docker compose up --build -d
-docker compose logs -f
+docker compose logs -f backend
+docker compose logs -f frontend
 docker compose down
 docker compose down -v
 ```
+
+## Demo flow
+
+1. Open the dashboard.
+2. Pick a housing policy and priority.
+3. Run the simulation.
+4. Inspect which loops stay dangerous.
+5. Review the suggested interventions and tradeoffs.
+
+## Notes
+
+- The simulation is deterministic and explainable by design.
+- The advisor layer is grounded on structured policy logic so the demo still works even if generative AI is unavailable.
+- `understand.md` contains the product brief, technical concept note, and B2G pitch framing.
