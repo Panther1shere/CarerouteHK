@@ -1,0 +1,37 @@
+<main class="shell">
+  <section class="card">
+    <p class="eyebrow">Connection Test Boilerplate</p>
+    <h1>Angular Frontend is running successfully!</h1>
+    <p class="lead">
+      This screen confirms the Angular app is live and can reach FastAPI, which in turn
+      queries PostgreSQL.
+    </p>
+
+    <div class="service-grid">
+      <article class="service-pill">
+        <span class="service-label">Frontend</span>
+        <strong>Angular</strong>
+      </article>
+      <article class="service-pill">
+        <span class="service-label">Backend</span>
+        <strong>FastAPI</strong>
+      </article>
+      <article class="service-pill">
+        <span class="service-label">Database</span>
+        <strong>PostgreSQL</strong>
+      </article>
+    </div>
+
+    <section class="response-panel">
+      <p class="response-label">Database Message via FastAPI</p>
+
+      @if (isLoading()) {
+        <p class="status-text">Loading message from the backend...</p>
+      } @else if (errorMessage()) {
+        <p class="status-text error">{{ errorMessage() }}</p>
+      } @else {
+        <p class="status-text success">{{ databaseMessage() }}</p>
+      }
+    </section>
+  </section>
+</main>
