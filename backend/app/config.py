@@ -13,6 +13,9 @@ class Settings(BaseSettings):
     backend_port: int = 8000
     allowed_origins: str = "http://localhost:4200"
     advisor_mode: str = "heuristic-grounded-advisor"
+    openai_api_key: str = ""
+    openai_model: str = "gpt-4o-mini"
+    openai_timeout_seconds: int = 45
 
     model_config = SettingsConfigDict(
         env_file=".env",

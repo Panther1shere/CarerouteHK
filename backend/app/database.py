@@ -141,9 +141,155 @@ async def initialize_database() -> None:
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             );
             """,
+            """
+            CREATE TABLE IF NOT EXISTS stakeholder_entities (
+                id SERIAL PRIMARY KEY,
+                slug TEXT NOT NULL UNIQUE,
+                name TEXT NOT NULL,
+                stakeholder_type TEXT NOT NULL,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            );
+            """,
+            """
+            CREATE TABLE IF NOT EXISTS policy_documents (
+                id SERIAL PRIMARY KEY,
+                policy_text TEXT NOT NULL,
+                policy_domain TEXT NOT NULL,
+                llm_model TEXT NOT NULL,
+                raw_analysis_json TEXT NOT NULL,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            );
+            """,
+            """
+            CREATE TABLE IF NOT EXISTS policy_system_node_catalog (
+                id SERIAL PRIMARY KEY,
+                slug TEXT NOT NULL UNIQUE,
+                label TEXT NOT NULL,
+                default_category TEXT NOT NULL,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            );
+            """,
+            """
+            CREATE TABLE IF NOT EXISTS policy_stakeholder_analyses (
+                id SERIAL PRIMARY KEY,
+                policy_document_id INTEGER NOT NULL REFERENCES policy_documents(id) ON DELETE CASCADE,
+                stakeholder_entity_id INTEGER REFERENCES stakeholder_entities(id) ON DELETE SET NULL,
+                stakeholder_name TEXT NOT NULL,
+                stakeholder_summary TEXT NOT NULL,
+                main_motivation TEXT NOT NULL,
+                goals TEXT NOT NULL,
+                organizational_structure_shareholders TEXT NOT NULL,
+                corporate_culture_communication_processes TEXT NOT NULL,
+                required_resources_dependencies TEXT NOT NULL,
+                available_resources TEXT NOT NULL,
+                stakeholders_text TEXT NOT NULL,
+                cooperation_partners TEXT NOT NULL,
+                competitors_antagonists TEXT NOT NULL,
+                legislators_national_international TEXT NOT NULL,
+                economic_policy_regulation TEXT NOT NULL,
+                global_markets_trends TEXT NOT NULL,
+                society_public_ngos TEXT NOT NULL,
+                media_social_media TEXT NOT NULL,
+                technological_developments TEXT NOT NULL,
+                environment_climate_change TEXT NOT NULL,
+                cultural_norms_values TEXT NOT NULL,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            );
+            """,
+            """
+            CREATE TABLE IF NOT EXISTS policy_system_nodes (
+                id SERIAL PRIMARY KEY,
+                policy_document_id INTEGER NOT NULL REFERENCES policy_documents(id) ON DELETE CASCADE,
+                node_catalog_id INTEGER NOT NULL REFERENCES policy_system_node_catalog(id) ON DELETE CASCADE,
+                description TEXT NOT NULL,
+                level TEXT NOT NULL,
+                category TEXT NOT NULL,
+                related_stakeholder_ids_json TEXT NOT NULL,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                UNIQUE(policy_document_id, node_catalog_id)
+            );
+            """,
+            """
+            CREATE TABLE IF NOT EXISTS policy_system_connections (
+                id SERIAL PRIMARY KEY,
+                policy_document_id INTEGER NOT NULL REFERENCES policy_documents(id) ON DELETE CASCADE,
+                source_policy_node_id INTEGER NOT NULL REFERENCES policy_system_nodes(id) ON DELETE CASCADE,
+                target_policy_node_id INTEGER NOT NULL REFERENCES policy_system_nodes(id) ON DELETE CASCADE,
+                relationship_type TEXT NOT NULL,
+                explanation TEXT NOT NULL,
+                polarity TEXT NOT NULL CHECK (polarity IN ('+', '-')),
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            );
+            """,
+            """
+            CREATE TABLE IF NOT EXISTS policy_feedback_loops (
+                id SERIAL PRIMARY KEY,
+                policy_document_id INTEGER NOT NULL REFERENCES policy_documents(id) ON DELETE CASCADE,
+                loop_name TEXT NOT NULL,
+                loop_type TEXT NOT NULL,
+                explanation TEXT NOT NULL,
+                affected_stakeholder_ids_json TEXT NOT NULL,
+                possible_intervention_points_json TEXT NOT NULL,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            );
+            """,
+            """
+            CREATE TABLE IF NOT EXISTS policy_feedback_loop_nodes (
+                id SERIAL PRIMARY KEY,
+                feedback_loop_id INTEGER NOT NULL REFERENCES policy_feedback_loops(id) ON DELETE CASCADE,
+                policy_node_id INTEGER NOT NULL REFERENCES policy_system_nodes(id) ON DELETE CASCADE
+            );
+            """,
+            """
+            CREATE TABLE IF NOT EXISTS policy_feedback_loop_connections (
+                id SERIAL PRIMARY KEY,
+                feedback_loop_id INTEGER NOT NULL REFERENCES policy_feedback_loops(id) ON DELETE CASCADE,
+                connection_id INTEGER NOT NULL REFERENCES policy_system_connections(id) ON DELETE CASCADE
+            );
+            """,
+            """
+            CREATE TABLE IF NOT EXISTS policy_system_boundaries (
+                id SERIAL PRIMARY KEY,
+                policy_document_id INTEGER NOT NULL REFERENCES policy_documents(id) ON DELETE CASCADE,
+                system_purpose TEXT NOT NULL,
+                included_node_ids_json TEXT NOT NULL,
+                excluded_or_external_factors_json TEXT NOT NULL,
+                explanation TEXT NOT NULL,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            );
+            """,
+            """
+            CREATE TABLE IF NOT EXISTS policy_boundary_nodes (
+                id SERIAL PRIMARY KEY,
+                boundary_id INTEGER NOT NULL REFERENCES policy_system_boundaries(id) ON DELETE CASCADE,
+                policy_node_id INTEGER NOT NULL REFERENCES policy_system_nodes(id) ON DELETE CASCADE,
+                inclusion_type TEXT NOT NULL
+            );
+            """,
+            """
+            CREATE TABLE IF NOT EXISTS policy_notes (
+                id SERIAL PRIMARY KEY,
+                related_object_type TEXT NOT NULL,
+                related_object_id INTEGER,
+                policy_document_id INTEGER NOT NULL REFERENCES policy_documents(id) ON DELETE CASCADE,
+                note_text TEXT NOT NULL,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            );
+            """,
         ]
 
         for statement in create_statements:
+            await connection.execute(text(statement))
+
+        alter_statements = [
+            """
+            ALTER TABLE policy_stakeholder_analyses
+            ADD COLUMN IF NOT EXISTS stakeholder_entity_id INTEGER REFERENCES stakeholder_entities(id) ON DELETE SET NULL;
+            """,
+        ]
+
+        for statement in alter_statements:
             await connection.execute(text(statement))
 
         await connection.execute(text("DELETE FROM simulation_runs;"))

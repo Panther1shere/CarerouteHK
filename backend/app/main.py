@@ -7,6 +7,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.advisor import recommend_interventions
 from app.config import get_settings
 from app.database import dispose_database, get_session, initialize_database
+from app.policy_analysis_router import router as policy_analysis_router
 from app.repository import (
     get_default_scenario,
     get_edges,
@@ -43,7 +44,12 @@ async def lifespan(_: FastAPI):
         await dispose_database()
 
 
-app = FastAPI(title="Housing Policy Loop Navigator API", lifespan=lifespan)
+app = FastAPI(
+    title="Housing Policy Loop Navigator API",
+    lifespan=lifespan,
+    docs_url="/swagger-ui/index.html",
+    redoc_url=None,
+)
 
 app.add_middleware(
     CORSMiddleware,
@@ -52,6 +58,8 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+app.include_router(policy_analysis_router)
 
 
 @app.get("/healthz")
