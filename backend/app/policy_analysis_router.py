@@ -10,8 +10,10 @@ from app.schemas import (
     PolicyAnalysisRequest,
     PolicyAnalysisResponse,
     PolicyDeleteResponse,
+    PolicyEnhancementAnalysisResponse,
     PolicyFeedbackLoop,
     PolicyGraphResponse,
+    PolicyInterventionAnalysisResponse,
     PolicyInterventionPointsResponse,
     PolicyNoteCreateRequest,
     PolicyNoteResponse,
@@ -129,6 +131,28 @@ async def get_policy_intervention_points(
     service: PolicyAnalysisService = Depends(get_policy_analysis_service),
 ) -> PolicyInterventionPointsResponse:
     return await service.get_policy_intervention_points(policy_id)
+
+
+@router.get(
+    "/policy/{policy_id}/interventions/analysis",
+    response_model=PolicyInterventionAnalysisResponse,
+)
+async def get_policy_intervention_analysis(
+    policy_id: int,
+    service: PolicyAnalysisService = Depends(get_policy_analysis_service),
+) -> PolicyInterventionAnalysisResponse:
+    return await service.get_policy_intervention_analysis(policy_id)
+
+
+@router.get(
+    "/policy/{policy_id}/policy-enhancements",
+    response_model=PolicyEnhancementAnalysisResponse,
+)
+async def get_policy_enhancement_analysis(
+    policy_id: int,
+    service: PolicyAnalysisService = Depends(get_policy_analysis_service),
+) -> PolicyEnhancementAnalysisResponse:
+    return await service.get_policy_enhancement_analysis(policy_id)
 
 
 @router.get("/policy/{policy_id}/graph", response_model=PolicyGraphResponse)

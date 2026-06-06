@@ -776,7 +776,221 @@ curl http://localhost:8000/policy/4/intervention-points
 
 ---
 
-## 13. Get Full Graph Payload
+## 13. Get Intervention Analysis
+### Endpoint name
+`GetPolicyInterventionAnalysis`
+
+### HTTP method
+`GET`
+
+### URL path
+`/policy/{policyId}/interventions/analysis`
+
+### Purpose
+Return a stronger intervention-analysis layer built from the saved policy text, stakeholders, feedback loops, nodes, boundary, and notes. This endpoint explains why each intervention is recommended, what evidence supports it, which loops and nodes it targets, what tradeoffs to watch, and what system shift is expected.
+
+### Request body expected
+None.
+
+### Query parameters
+None.
+
+### Path variables
+- `policyId`: integer
+
+### Response body format
+```json
+{
+  "policy_id": 4,
+  "generated_at": "2026-06-07T10:00:00Z",
+  "analysis_mode": "grounded-policy-analysis",
+  "summary": "Prioritize ...",
+  "recommendations": [
+    {
+      "rank": 1,
+      "intervention_key": "coordinate-approvals",
+      "title": "Coordinate approvals",
+      "recommended_action": "Use coordinate approvals ...",
+      "reason": "We are recommending ...",
+      "supporting_evidence": [],
+      "targeted_feedback_loop_ids": [],
+      "targeted_node_ids": [],
+      "affected_stakeholder_ids": [],
+      "stakeholder_focus": [],
+      "implementation_notes": [],
+      "tradeoffs": [],
+      "expected_system_shift": "Expected shift ...",
+      "confidence": 0.82
+    }
+  ]
+}
+```
+
+### Example request
+```bash
+curl http://localhost:8000/policy/4/interventions/analysis
+```
+
+### Example response
+```json
+{
+  "policy_id": 4,
+  "generated_at": "2026-06-07T09:12:10.123456+00:00",
+  "analysis_mode": "grounded-policy-analysis",
+  "summary": "Prioritize public reporting and coordinated delivery first. It has the strongest grounding in the current system map because it addresses 1 feedback loop, focuses on 3 stakeholder groups, and aligns with the system purpose of improving housing affordability through coordinated delivery.",
+  "recommendations": [
+    {
+      "rank": 1,
+      "intervention_key": "public-reporting-and-coordinated-delivery",
+      "title": "Public reporting and coordinated delivery",
+      "recommended_action": "Use public reporting and coordinated delivery to directly change pressure on Public Trust, Delivery Coordination.",
+      "reason": "We are recommending public reporting and coordinated delivery because it directly addresses the trust-to-delivery loop, which is pushing pressure through Public Trust and Delivery Coordination.",
+      "supporting_evidence": [
+        "System purpose: Improve housing affordability through coordinated delivery.",
+        "Loop signal: When delivery stalls, public trust falls and approval friction rises.",
+        "Stakeholder pressure: Housing Department is motivated by delivery credibility and is pursuing visible execution progress."
+      ],
+      "targeted_feedback_loop_ids": [2],
+      "targeted_node_ids": [15, 18],
+      "affected_stakeholder_ids": [8, 12, 14],
+      "stakeholder_focus": [
+        "Government Agencies",
+        "Tenants",
+        "Private Developers"
+      ],
+      "implementation_notes": [
+        "Coordinate with Government Agencies around funding and approvals."
+      ],
+      "tradeoffs": [
+        "Government Agencies: regulatory exposure remains tied to rental regulation and subsidy policy."
+      ],
+      "expected_system_shift": "Expected shift: reduce reinforcing pressure across Public Trust and Delivery Coordination while keeping the system aligned with improving housing affordability through coordinated delivery.",
+      "confidence": 0.84
+    }
+  ]
+}
+```
+
+### Error cases
+- `404` if the policy does not exist.
+
+### Database entities/tables affected
+- Reads `policy_documents`
+- Reads `policy_stakeholder_analyses`
+- Reads `stakeholder_entities`
+- Reads `policy_system_nodes`
+- Reads `policy_system_connections`
+- Reads `policy_feedback_loops`
+- Reads `policy_system_boundaries`
+- Reads `policy_notes`
+
+---
+
+## 14. Get Policy Enhancements
+### Endpoint name
+`GetPolicyEnhancementAnalysis`
+
+### HTTP method
+`GET`
+
+### URL path
+`/policy/{policyId}/policy-enhancements`
+
+### Purpose
+Return drafting guidance for how to incorporate the recommended interventions directly into the policy text. This endpoint focuses on:
+- what to add to the policy
+- where to add it
+- why it should be added
+- which stakeholders it affects
+- what risk remains if it is omitted
+
+### Request body expected
+None.
+
+### Query parameters
+None.
+
+### Path variables
+- `policyId`: integer
+
+### Response body format
+```json
+{
+  "policy_id": 8,
+  "generated_at": "2026-06-07T10:30:00Z",
+  "analysis_mode": "grounded-policy-enhancement",
+  "summary": "Start by strengthening the implementation and delivery section...",
+  "suggestions": [
+    {
+      "rank": 1,
+      "enhancement_key": "policy-addition-stabilize-affordable-housing-supply",
+      "title": "Add Stabilize Affordable Housing Supply language",
+      "suggested_policy_section": "Implementation and Delivery",
+      "what_to_add": "Add a clause that requires ...",
+      "draft_clause": "The policy shall require ...",
+      "reason": "Add this because ...",
+      "affected_stakeholder_ids": [12, 22],
+      "affected_stakeholders": ["Tenants", "Landlords"],
+      "based_on_intervention_keys": ["stabilize-affordable-housing-supply"],
+      "based_on_feedback_loop_ids": [],
+      "based_on_node_ids": [35],
+      "expected_policy_effect": "Expected effect: ...",
+      "risks_if_omitted": []
+    }
+  ]
+}
+```
+
+### Example request
+```bash
+curl http://localhost:8000/policy/8/policy-enhancements
+```
+
+### Example response
+```json
+{
+  "policy_id": 8,
+  "generated_at": "2026-06-07T10:31:44.112233+00:00",
+  "analysis_mode": "grounded-policy-enhancement",
+  "summary": "Start by strengthening the implementation and delivery section. The highest-ranked intervention is most useful when translated into explicit policy text instead of remaining only as an external recommendation.",
+  "suggestions": [
+    {
+      "rank": 1,
+      "enhancement_key": "policy-addition-stabilize-affordable-housing-supply",
+      "title": "Add Stabilize Affordable Housing Supply language",
+      "suggested_policy_section": "Implementation and Delivery",
+      "what_to_add": "Add a clause that requires Tenants, Landlords to take explicit action on Affordable Housing Supply, with named responsibilities, clear timelines, and a review trigger if delivery or safeguards fall behind.",
+      "draft_clause": "The policy shall require Tenants, Landlords to coordinate actions affecting Affordable Housing Supply, publish progress milestones, and initiate corrective review where targets, safeguards, or service readiness are not being met.",
+      "reason": "Add this because the intervention analysis shows that Tenants, Landlords are materially affected through Affordable Housing Supply. Writing the intervention into the policy turns it into an enforceable operating instruction rather than a separate advisory idea.",
+      "affected_stakeholder_ids": [12, 22],
+      "affected_stakeholders": ["Tenants", "Landlords"],
+      "based_on_intervention_keys": ["stabilize-affordable-housing-supply"],
+      "based_on_feedback_loop_ids": [],
+      "based_on_node_ids": [35],
+      "expected_policy_effect": "Expected effect: shift Affordable Housing Supply from informal implementation risk into explicit policy execution that can be monitored and enforced.",
+      "risks_if_omitted": [
+        "The intervention may remain advisory, with no explicit policy obligation to act on it."
+      ]
+    }
+  ]
+}
+```
+
+### Error cases
+- `404` if the policy does not exist.
+
+### Database entities/tables affected
+- Reads `policy_documents`
+- Reads `policy_stakeholder_analyses`
+- Reads `stakeholder_entities`
+- Reads `policy_system_nodes`
+- Reads `policy_feedback_loops`
+- Reads `policy_system_boundaries`
+- Reads `policy_notes`
+
+---
+
+## 15. Get Full Graph Payload
 ### Endpoint name
 `GetPolicyGraph`
 
@@ -848,7 +1062,7 @@ curl http://localhost:8000/policy/4/graph
 
 ---
 
-## 14. Delete Policy
+## 16. Delete Policy
 ### Endpoint name
 `DeletePolicy`
 
@@ -933,5 +1147,7 @@ curl -X DELETE http://localhost:8000/policy/4
 6. Run `POST /policy/{policyId}/notes`.
 7. Run `GET /policy/{policyId}/notes`.
 8. Run `GET /policy/{policyId}/intervention-points`.
-9. Run `DELETE /policy/{policyId}`.
-10. Confirm `GET /policy/{policyId}` now returns `404`.
+9. Run `GET /policy/{policyId}/interventions/analysis`.
+10. Run `GET /policy/{policyId}/policy-enhancements`.
+11. Run `DELETE /policy/{policyId}`.
+12. Confirm `GET /policy/{policyId}` now returns `404`.

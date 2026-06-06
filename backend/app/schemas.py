@@ -332,6 +332,56 @@ class PolicyGraphResponse(BaseModel):
     intervention_points: list[str]
 
 
+class PolicyInterventionRecommendation(BaseModel):
+    rank: int
+    intervention_key: str
+    title: str
+    recommended_action: str
+    reason: str
+    supporting_evidence: list[str]
+    targeted_feedback_loop_ids: list[int]
+    targeted_node_ids: list[int]
+    affected_stakeholder_ids: list[int]
+    stakeholder_focus: list[str]
+    implementation_notes: list[str]
+    tradeoffs: list[str]
+    expected_system_shift: str
+    confidence: float
+
+
+class PolicyInterventionAnalysisResponse(BaseModel):
+    policy_id: int
+    generated_at: str
+    analysis_mode: str
+    summary: str
+    recommendations: list[PolicyInterventionRecommendation]
+
+
+class PolicyEnhancementSuggestion(BaseModel):
+    rank: int
+    enhancement_key: str
+    title: str
+    suggested_policy_section: str
+    what_to_add: str
+    draft_clause: str
+    reason: str
+    affected_stakeholder_ids: list[int]
+    affected_stakeholders: list[str]
+    based_on_intervention_keys: list[str]
+    based_on_feedback_loop_ids: list[int]
+    based_on_node_ids: list[int]
+    expected_policy_effect: str
+    risks_if_omitted: list[str]
+
+
+class PolicyEnhancementAnalysisResponse(BaseModel):
+    policy_id: int
+    generated_at: str
+    analysis_mode: str
+    summary: str
+    suggestions: list[PolicyEnhancementSuggestion]
+
+
 class PolicySystemMapStakeholderInput(BaseModel):
     stakeholder_key: str
     stakeholder_name: str
