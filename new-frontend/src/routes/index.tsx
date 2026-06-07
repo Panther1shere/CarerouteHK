@@ -20,13 +20,13 @@ import {
 export const Route = createFileRoute("/")({
   head: () => ({
     meta: [
-      { title: "PolicyGraph HK · Housing Module — Government Decision Platform" },
+      { title: "PolicyGraph HK" },
       {
         name: "description",
         content:
           "Internal decision-support platform for HKSAR policy teams. Simulate housing policies, map stakeholders, and surface high-leverage interventions.",
       },
-      { property: "og:title", content: "PolicyGraph HK · Government Decision Platform" },
+      { property: "og:title", content: "PolicyGraph HK" },
       {
         property: "og:description",
         content: "Simulate housing policies against a system model before implementation.",

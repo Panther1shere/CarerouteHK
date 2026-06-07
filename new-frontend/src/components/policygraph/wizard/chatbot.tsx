@@ -7,7 +7,7 @@ import { chatWithContext } from "@/lib/policygraph/analyze.functions";
 
 export function Chatbot() {
   const { step, query, horizon, analysis, selectedDatasets, chatMessages, setChatMessages } = useWizard();
-  const [open, setOpen] = useState(true);
+  const [open, setOpen] = useState(false);
   const [input, setInput] = useState("");
   const scrollRef = useRef<HTMLDivElement>(null);
   const fn = useServerFn(chatWithContext);

@@ -77,7 +77,7 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
     meta: [
       { charSet: "utf-8" },
       { name: "viewport", content: "width=device-width, initial-scale=1" },
-      { title: "PolicyGraph HK — Decision intelligence for housing policy" },
+      { title: "PolicyGraph HK" },
       {
         name: "description",
         content:
