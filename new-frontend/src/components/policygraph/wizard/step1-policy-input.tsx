@@ -5,15 +5,6 @@ import { Upload, FileText, Loader2, Play, X, AlertCircle } from "lucide-react";
 import { useWizard } from "./wizard-context";
 import { analyzePolicy, parseDraft } from "@/lib/policygraph/analyze.functions";
 
-const PRESETS = [
-  "Stronger rent control in high-density districts",
-  "Vacancy tax on idle residential units",
-  "Faster approvals for public housing projects",
-  "Release land in the Northern Metropolis for residential use",
-  "Targeted rent subsidies for low-income households",
-  "Convert idle commercial space to transitional housing",
-];
-
 export function Step1PolicyInput() {
   const w = useWizard();
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -75,8 +66,8 @@ export function Step1PolicyInput() {
           What policy do you want to analyse?
         </h2>
         <p className="mt-2 max-w-2xl text-sm text-muted-foreground">
-          Describe a policy in plain language, pick a preset, or upload a draft document. The
-          model will plan its own dataset queries against data.gov.hk before any analysis.
+          Describe a policy in plain language, or upload a draft document. The model will
+          plan its own dataset queries against data.gov.hk before any analysis.
         </p>
       </div>
 
@@ -91,22 +82,6 @@ export function Step1PolicyInput() {
           placeholder="e.g. tax SDU landlords and route revenue into transitional housing"
           className="mt-2 w-full resize-y rounded-lg border hairline bg-background/60 px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-primary/40"
         />
-
-        <div className="mt-3 flex flex-wrap gap-2">
-          {PRESETS.map((p) => (
-            <button
-              key={p}
-              onClick={() => w.setQuery(p)}
-              className={`rounded-full border px-3 py-1.5 text-xs transition ${
-                w.query === p
-                  ? "border-primary bg-primary/10"
-                  : "hairline bg-background/40 text-muted-foreground hover:text-foreground"
-              }`}
-            >
-              {p}
-            </button>
-          ))}
-        </div>
 
         <div className="mt-5 flex flex-wrap items-center gap-4">
           <span className="font-mono text-[10px] uppercase tracking-wider text-muted-foreground">

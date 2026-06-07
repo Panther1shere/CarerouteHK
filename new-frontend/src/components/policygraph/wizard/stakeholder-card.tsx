@@ -2,16 +2,6 @@ import { useState } from "react";
 import { ChevronDown, Trash2, ExternalLink } from "lucide-react";
 import type { Stakeholder } from "@/lib/policygraph/analyze.functions";
 
-function describeImpact(v: number) {
-  const mag = Math.abs(v);
-  if (mag < 1) return "Unaffected";
-  const dir = v >= 0 ? "positive" : "negative";
-  if (mag <= 20) return `Slightly ${dir}`;
-  if (mag <= 50) return `Moderately ${dir}`;
-  if (mag <= 80) return `Very ${dir}`;
-  return `Extremely ${dir}`;
-}
-
 const LEVEL_STYLE: Record<Stakeholder["level"], { label: string; bar: string; tint: string }> = {
   micro: { label: "Micro Level", bar: "bg-slate-500", tint: "bg-slate-500/5" },
   meso: { label: "Meso Level", bar: "bg-sky-600", tint: "bg-sky-600/5" },
@@ -46,15 +36,6 @@ export function StakeholderCard({
             </span>
           </div>
           <div className="mt-0.5 truncate text-sm font-semibold">{s.label}</div>
-        </div>
-        <div className="hidden text-right md:block min-w-[110px]">
-          <div className="font-mono text-[9px] uppercase tracking-wider text-muted-foreground">Impact</div>
-          <div
-            className="text-sm font-medium"
-            style={{ color: s.impact > 0 ? "var(--color-jade)" : s.impact < 0 ? "var(--color-coral)" : undefined }}
-          >
-            {describeImpact(s.impact)}
-          </div>
         </div>
         {onRemove && (
           <button
