@@ -279,7 +279,8 @@ function GraphPanel({
   onSelectNode: (nodeId: string) => void;
 }) {
   const loopNodeIds = useMemo(() => new Set(activeLoop?.nodes ?? []), [activeLoop]);
-  const nodeById = useMemo(() => new Map(data.nodes.map((node) => [node.id, node])), [data.nodes]);
+  const graphNodes = useMemo(() => spreadDemoGraphNodes(data.nodes), [data.nodes]);
+  const nodeById = useMemo(() => new Map(graphNodes.map((node) => [node.id, node])), [graphNodes]);
 
   return (
     <section className="rounded-[34px] border border-white/70 bg-white/80 p-5 shadow-[0_18px_60px_rgba(23,32,51,0.08)] backdrop-blur-xl">
@@ -303,8 +304,8 @@ function GraphPanel({
         </div>
       </div>
 
-      <div className="mt-5 overflow-hidden rounded-[30px] border border-[#172033]/8 bg-[linear-gradient(180deg,#fbfcff,#f6f1e8)]">
-        <svg viewBox="0 0 1180 650" className="h-auto w-full">
+      <div className="mt-5 overflow-x-auto overflow-y-hidden rounded-[30px] border border-[#172033]/8 bg-[linear-gradient(180deg,#fbfcff,#f6f1e8)]">
+        <svg viewBox="0 0 1500 650" className="h-auto min-w-[1300px] w-full">
           <defs>
             <marker
               id="demo-arrow-positive"
@@ -373,7 +374,7 @@ function GraphPanel({
             );
           })}
 
-          {data.nodes.map((node) => {
+          {graphNodes.map((node) => {
             const tone = TONE_STYLES[node.tone];
             const active = loopNodeIds.has(node.id) || activeNodeId === node.label;
             return (
@@ -434,6 +435,23 @@ function GraphPanel({
       )}
     </section>
   );
+}
+
+function spreadDemoGraphNodes(nodes: DemoPolicyGraph["nodes"]) {
+  if (nodes.length === 0) return [];
+  const minX = Math.min(...nodes.map((node) => node.x));
+  const maxX = Math.max(...nodes.map((node) => node.x));
+  const minY = Math.min(...nodes.map((node) => node.y));
+  const maxY = Math.max(...nodes.map((node) => node.y));
+  const sourceWidth = Math.max(maxX - minX, 1);
+  const sourceHeight = Math.max(maxY - minY, 1);
+  const target = { minX: 140, maxX: 1360, minY: 82, maxY: 590 };
+
+  return nodes.map((node) => ({
+    ...node,
+    x: target.minX + ((node.x - minX) / sourceWidth) * (target.maxX - target.minX),
+    y: target.minY + ((node.y - minY) / sourceHeight) * (target.maxY - target.minY),
+  }));
 }
 
 function edgePath(

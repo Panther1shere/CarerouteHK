@@ -38,6 +38,22 @@ const LOOP_STYLES = {
   },
 } as const;
 
+const CANVAS_WIDTH = 1680;
+const CANVAS_HEIGHT = 640;
+const NODE_WIDTH = 116;
+const NODE_HEIGHT = 76;
+const LAYOUT_BOUNDS = {
+  minX: 84,
+  maxX: CANVAS_WIDTH - 84,
+  minY: 72,
+  maxY: CANVAS_HEIGHT - 72,
+};
+const LEVEL_LANES: Record<GraphNode["level"], number> = {
+  Macro: 128,
+  Meso: 320,
+  Micro: 512,
+};
+
 interface Props {
   nodes: GraphNode[];
   edges: GraphEdge[];
@@ -142,17 +158,17 @@ export function SystemMapCanvas({
   }
 
   return (
-    <div className="overflow-hidden rounded-3xl border hairline bg-white shadow-[0_20px_45px_rgba(15,23,42,0.05)]">
+    <div className="overflow-x-auto overflow-y-hidden rounded-3xl border hairline bg-white shadow-[0_20px_45px_rgba(15,23,42,0.05)]">
       <svg
         ref={svgRef}
-        viewBox="0 0 1180 760"
-        className="block h-auto w-full touch-none select-none bg-[radial-gradient(circle_at_top,rgba(37,99,235,0.05),transparent_32%),linear-gradient(180deg,rgba(255,255,255,1),rgba(248,250,252,1))]"
+        viewBox={`0 0 ${CANVAS_WIDTH} ${CANVAS_HEIGHT}`}
+        className="block h-auto min-w-[1360px] w-full touch-none select-none bg-[radial-gradient(circle_at_top,rgba(37,99,235,0.05),transparent_32%),linear-gradient(180deg,rgba(255,255,255,1),rgba(248,250,252,1))]"
         onPointerMove={(event) => {
           if (dragId === null) return;
           const { x, y } = toSvg(event.clientX, event.clientY);
           setPositions((current) => ({
             ...current,
-            [dragId]: { x, y },
+            [dragId]: clampPoint({ x, y }),
           }));
         }}
         onPointerUp={() => {
@@ -460,8 +476,8 @@ function truncate(value: string, max: number) {
 type PositionedGraphNode = GraphNode & { x: number; y: number };
 
 function getNodeBox(node: Pick<GraphNode, "label" | "description"> & { x?: number; y?: number }) {
-  const width = 104;
-  const height = 72;
+  const width = NODE_WIDTH;
+  const height = NODE_HEIGHT;
   return { x: node.x ?? 0, y: node.y ?? 0, width, height };
 }
 
@@ -485,8 +501,8 @@ function getTooltipBox(node: GraphNode, pos: { x: number; y: number }) {
   return {
     width,
     height,
-    x: clamp(pos.x - width / 2, 18, 1180 - width - 18),
-    y: clamp(pos.y - 116, 18, 760 - height - 18),
+    x: clamp(pos.x - width / 2, 18, CANVAS_WIDTH - width - 18),
+    y: clamp(pos.y - 116, 18, CANVAS_HEIGHT - height - 18),
   };
 }
 
@@ -688,12 +704,12 @@ function buildLoopPath(points: { x: number; y: number }[]) {
 
 function buildInitialPositions(nodes: GraphNode[], edges: GraphEdge[]) {
   const persisted = Object.fromEntries(
-    nodes.map((node) => [node.policy_node_id, { x: node.x ?? 0, y: node.y ?? 0 }]),
+    nodes.map((node) => [node.policy_node_id, clampPoint({ x: node.x ?? 0, y: node.y ?? 0 })]),
   );
   const hasFullPositions = nodes.every(
     (node) => typeof node.x === "number" && typeof node.y === "number",
   );
-  if (hasFullPositions && !hasNodeOverlap(nodes, persisted)) {
+  if (hasFullPositions && isUsablePersistedLayout(nodes, persisted)) {
     return persisted;
   }
 
@@ -702,41 +718,43 @@ function buildInitialPositions(nodes: GraphNode[], edges: GraphEdge[]) {
     Meso: nodes.filter((node) => node.level === "Meso"),
     Macro: nodes.filter((node) => node.level === "Macro"),
   } satisfies Record<GraphNode["level"], GraphNode[]>;
-  const columns: Record<GraphNode["level"], number> = {
-    Micro: 210,
-    Meso: 590,
-    Macro: 980,
-  };
+  const orderScore = buildOrderScore(nodes, edges);
 
   const next: Record<number, { x: number; y: number }> = {};
+  const anchors: Record<number, { x: number; y: number }> = {};
   (Object.keys(grouped) as GraphNode["level"][]).forEach((level) => {
-    const items = grouped[level];
+    const items = [...grouped[level]].sort((left, right) => {
+      const score =
+        (orderScore.get(left.policy_node_id) ?? 0) - (orderScore.get(right.policy_node_id) ?? 0);
+      return score || left.policy_node_id - right.policy_node_id;
+    });
+    const laneY = LEVEL_LANES[level];
+    const startX = LAYOUT_BOUNDS.minX + 72;
+    const endX = LAYOUT_BOUNDS.maxX - 72;
     items.forEach((node, index) => {
       const count = Math.max(items.length, 1);
-      const y = count === 1 ? 380 : 110 + (index * 540) / Math.max(count - 1, 1);
-      next[node.policy_node_id] = {
-        x: columns[level] + (index % 2 === 0 ? -26 : 26),
-        y,
-      };
+      const x = count === 1 ? CANVAS_WIDTH / 2 : startX + (index * (endX - startX)) / (count - 1);
+      const y = laneY + ((index % 3) - 1) * 18;
+      anchors[node.policy_node_id] = { x, y: laneY };
+      next[node.policy_node_id] = { x, y };
     });
   });
-  return relaxLayout(nodes, edges, next, columns);
+  return relaxLayout(nodes, edges, next, anchors);
 }
 
 function relaxLayout(
   nodes: GraphNode[],
   edges: GraphEdge[],
   positions: Record<number, { x: number; y: number }>,
-  columns: Record<GraphNode["level"], number>,
+  anchors: Record<number, { x: number; y: number }>,
 ) {
   const next = Object.fromEntries(
     Object.entries(positions).map(([id, point]) => [Number(id), { ...point }]),
   );
   const nodeMap = new Map(nodes.map((node) => [node.policy_node_id, node]));
-  const bounds = { minX: 78, maxX: 1102, minY: 76, maxY: 684 };
-  const desiredGap = 146;
+  const desiredGap = 164;
 
-  for (let iteration = 0; iteration < 180; iteration += 1) {
+  for (let iteration = 0; iteration < 220; iteration += 1) {
     const forces: Record<number, { x: number; y: number }> = Object.fromEntries(
       nodes.map((node) => [node.policy_node_id, { x: 0, y: 0 }]),
     );
@@ -755,7 +773,7 @@ function relaxLayout(
           dy = (right.policy_node_id % 5) - 2 || 1;
           distance = Math.hypot(dx, dy);
         }
-        const repulsion = Math.min(22, (desiredGap * desiredGap) / (distance * distance));
+        const repulsion = Math.min(26, (desiredGap * desiredGap) / (distance * distance));
         forces[left.policy_node_id].x += (dx / distance) * repulsion;
         forces[left.policy_node_id].y += (dy / distance) * repulsion;
         forces[right.policy_node_id].x -= (dx / distance) * repulsion;
@@ -774,23 +792,35 @@ function relaxLayout(
       const distance = Math.max(Math.hypot(dx, dy), 1);
       const preferred = source.level === target.level ? 190 : 285;
       const pull = (distance - preferred) * 0.009;
+      const flowGap = source.level === target.level ? 130 : 170;
+      const flowPush = Math.max(0, flowGap - dx) * 0.006;
       forces[source.policy_node_id].x += (dx / distance) * pull;
       forces[source.policy_node_id].y += (dy / distance) * pull;
       forces[target.policy_node_id].x -= (dx / distance) * pull;
       forces[target.policy_node_id].y -= (dy / distance) * pull;
+      forces[source.policy_node_id].x -= flowPush;
+      forces[target.policy_node_id].x += flowPush;
     }
 
     for (const node of nodes) {
       const point = next[node.policy_node_id];
       const force = forces[node.policy_node_id];
-      const targetX = columns[node.level];
-      force.x += (targetX - point.x) * 0.02;
-      point.x = clamp(point.x + force.x * 0.36, bounds.minX, bounds.maxX);
-      point.y = clamp(point.y + force.y * 0.36, bounds.minY, bounds.maxY);
+      const anchor = anchors[node.policy_node_id] ?? {
+        x: CANVAS_WIDTH / 2,
+        y: LEVEL_LANES[node.level],
+      };
+      force.x += (anchor.x - point.x) * 0.018;
+      force.y += (anchor.y - point.y) * 0.075;
+      const moved = clampPoint({
+        x: point.x + force.x * 0.34,
+        y: point.y + force.y * 0.34,
+      });
+      point.x = moved.x;
+      point.y = moved.y;
     }
   }
 
-  for (let pass = 0; pass < 42; pass += 1) {
+  for (let pass = 0; pass < 60; pass += 1) {
     for (let i = 0; i < nodes.length; i += 1) {
       for (let j = i + 1; j < nodes.length; j += 1) {
         const a = next[nodes[i].policy_node_id];
@@ -802,15 +832,52 @@ function relaxLayout(
         const push = (desiredGap - distance) / 2;
         const nx = dx / distance;
         const ny = dy / distance;
-        a.x = clamp(a.x - nx * push, bounds.minX, bounds.maxX);
-        a.y = clamp(a.y - ny * push, bounds.minY, bounds.maxY);
-        b.x = clamp(b.x + nx * push, bounds.minX, bounds.maxX);
-        b.y = clamp(b.y + ny * push, bounds.minY, bounds.maxY);
+        const nextA = clampPoint({ x: a.x - nx * push, y: a.y - ny * push });
+        const nextB = clampPoint({ x: b.x + nx * push, y: b.y + ny * push });
+        a.x = nextA.x;
+        a.y = nextA.y;
+        b.x = nextB.x;
+        b.y = nextB.y;
       }
     }
   }
 
   return next;
+}
+
+function buildOrderScore(nodes: GraphNode[], edges: GraphEdge[]) {
+  const score = new Map(nodes.map((node) => [node.policy_node_id, 0]));
+  for (const edge of edges) {
+    score.set(edge.source_node_id, (score.get(edge.source_node_id) ?? 0) - 1);
+    score.set(edge.target_node_id, (score.get(edge.target_node_id) ?? 0) + 1);
+  }
+  return score;
+}
+
+function isUsablePersistedLayout(
+  nodes: GraphNode[],
+  positions: Record<number, { x: number; y: number }>,
+) {
+  if (hasNodeOverlap(nodes, positions)) {
+    return false;
+  }
+  const points = nodes
+    .map((node) => positions[node.policy_node_id])
+    .filter((point): point is { x: number; y: number } => Boolean(point));
+  if (points.length < 2) {
+    return true;
+  }
+  const minX = Math.min(...points.map((point) => point.x));
+  const maxX = Math.max(...points.map((point) => point.x));
+  const hasWideSpread = maxX - minX > CANVAS_WIDTH * 0.62;
+  const allInside = points.every(
+    (point) =>
+      point.x >= LAYOUT_BOUNDS.minX &&
+      point.x <= LAYOUT_BOUNDS.maxX &&
+      point.y >= LAYOUT_BOUNDS.minY &&
+      point.y <= LAYOUT_BOUNDS.maxY,
+  );
+  return hasWideSpread && allInside;
 }
 
 function hasNodeOverlap(nodes: GraphNode[], positions: Record<number, { x: number; y: number }>) {
@@ -825,12 +892,19 @@ function hasNodeOverlap(nodes: GraphNode[], positions: Record<number, { x: numbe
     for (let j = i + 1; j < points.length; j += 1) {
       const dx = points[i].x - points[j].x;
       const dy = points[i].y - points[j].y;
-      if (Math.hypot(dx, dy) < 96) {
+      if (Math.hypot(dx, dy) < 132) {
         return true;
       }
     }
   }
   return false;
+}
+
+function clampPoint(point: { x: number; y: number }) {
+  return {
+    x: clamp(point.x, LAYOUT_BOUNDS.minX, LAYOUT_BOUNDS.maxX),
+    y: clamp(point.y, LAYOUT_BOUNDS.minY, LAYOUT_BOUNDS.maxY),
+  };
 }
 
 function clamp(value: number, min: number, max: number) {
