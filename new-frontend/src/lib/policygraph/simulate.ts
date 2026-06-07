@@ -14,16 +14,19 @@ export interface SimulationResult {
   bundleRationale: string;
 }
 
-export function simulate(policyIds: string[], horizon: "short" | "long" = "short"): SimulationResult {
+export function simulate(
+  policyIds: string[],
+  horizon: "short" | "long" = "short",
+): SimulationResult {
   const policies = policyIds.map(getPolicy).filter(Boolean) as Policy[];
   const primary = policies[0];
 
   const impact: Record<Dimension, number> = Object.fromEntries(
-    DIMENSIONS.map((d) => [d.id, 0])
+    DIMENSIONS.map((d) => [d.id, 0]),
   ) as Record<Dimension, number>;
 
   const counts: Record<Dimension, number> = Object.fromEntries(
-    DIMENSIONS.map((d) => [d.id, 0])
+    DIMENSIONS.map((d) => [d.id, 0]),
   ) as Record<Dimension, number>;
 
   for (const p of policies) {
@@ -59,9 +62,7 @@ export function simulate(policyIds: string[], horizon: "short" | "long" = "short
 
   const warnings = policies.flatMap((p) => p.warnings);
 
-  const bundle = primary.recommendedBundle
-    .map(getPolicy)
-    .filter(Boolean) as Policy[];
+  const bundle = primary.recommendedBundle.map(getPolicy).filter(Boolean) as Policy[];
 
   return {
     policies,

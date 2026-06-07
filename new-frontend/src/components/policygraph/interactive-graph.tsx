@@ -108,8 +108,7 @@ export function InteractiveGraph({ stakeholders }: { stakeholders: Stakeholder[]
         <circle cx={500} cy={300} r={260} fill="url(#hub)" />
 
         {edges.map(({ a, b, w }) => {
-          const dim =
-            focusId !== null && a.id !== focusId && b.id !== focusId ? 0.05 : w * 0.35;
+          const dim = focusId !== null && a.id !== focusId && b.id !== focusId ? 0.05 : w * 0.35;
           const stroke =
             focusId !== null && (a.id === focusId || b.id === focusId)
               ? "var(--color-amber)"
@@ -132,7 +131,11 @@ export function InteractiveGraph({ stakeholders }: { stakeholders: Stakeholder[]
           const isActive = Math.abs(n.impact) > 0.05;
           const r = isActive ? 22 + Math.abs(n.impact) * 18 : 14;
           const fill =
-            n.impact > 0 ? "var(--color-amber)" : n.impact < 0 ? "var(--color-coral)" : "var(--color-surface-2)";
+            n.impact > 0
+              ? "var(--color-amber)"
+              : n.impact < 0
+                ? "var(--color-coral)"
+                : "var(--color-surface-2)";
           const isFocus = n.id === focusId;
           const dim = focusId !== null && !isFocus ? 0.35 : 1;
           return (
@@ -211,7 +214,9 @@ export function InteractiveGraph({ stakeholders }: { stakeholders: Stakeholder[]
           <div className="mt-1 text-xs text-muted-foreground">{focusNode.note}</div>
           <div className="mt-2 font-mono text-[11px]">
             Impact{" "}
-            <span style={{ color: focusNode.impact > 0 ? "var(--color-jade)" : "var(--color-coral)" }}>
+            <span
+              style={{ color: focusNode.impact > 0 ? "var(--color-jade)" : "var(--color-coral)" }}
+            >
               {focusNode.impact > 0 ? "+" : ""}
               {(focusNode.impact * 100).toFixed(0)}
             </span>

@@ -22,12 +22,42 @@ export const Route = createFileRoute("/use-cases")({
 });
 
 const modules = [
-  { icon: Users, title: "Housing", status: "Live (demo)", body: "Affordability, supply, tenant protection, developer incentives, land supply." },
-  { icon: Bus, title: "Transport", status: "Q2 roadmap", body: "Congestion, network load, modal shift, infrastructure ROI." },
-  { icon: HeartPulse, title: "Elderly care", status: "Q3 roadmap", body: "Care capacity, family support, public spend, isolation risk." },
-  { icon: Leaf, title: "Climate resilience", status: "Q4 roadmap", body: "Flood risk, heat exposure, district-level adaptation portfolios." },
-  { icon: Stethoscope, title: "Public health", status: "Exploration", body: "Preventive care leverage, hospital load, behavioural feedback." },
-  { icon: Recycle, title: "Waste management", status: "Exploration", body: "Recycling rates, landfill load, producer-responsibility incentives." },
+  {
+    icon: Users,
+    title: "Housing",
+    status: "Live (demo)",
+    body: "Affordability, supply, tenant protection, developer incentives, land supply.",
+  },
+  {
+    icon: Bus,
+    title: "Transport",
+    status: "Q2 roadmap",
+    body: "Congestion, network load, modal shift, infrastructure ROI.",
+  },
+  {
+    icon: HeartPulse,
+    title: "Elderly care",
+    status: "Q3 roadmap",
+    body: "Care capacity, family support, public spend, isolation risk.",
+  },
+  {
+    icon: Leaf,
+    title: "Climate resilience",
+    status: "Q4 roadmap",
+    body: "Flood risk, heat exposure, district-level adaptation portfolios.",
+  },
+  {
+    icon: Stethoscope,
+    title: "Public health",
+    status: "Exploration",
+    body: "Preventive care leverage, hospital load, behavioural feedback.",
+  },
+  {
+    icon: Recycle,
+    title: "Waste management",
+    status: "Exploration",
+    body: "Recycling rates, landfill load, producer-responsibility incentives.",
+  },
 ];
 
 function UseCasesPage() {
@@ -40,8 +70,8 @@ function UseCasesPage() {
           Housing today. <span className="italic text-primary">The city tomorrow.</span>
         </h1>
         <p className="mt-6 max-w-2xl text-lg text-muted-foreground">
-          The platform generalises beyond housing. Each module is a new system model with its
-          own stakeholders, loops, dimensions, and intervention library.
+          The platform generalises beyond housing. Each module is a new system model with its own
+          stakeholders, loops, dimensions, and intervention library.
         </p>
 
         <div className="mt-12 grid gap-5 md:grid-cols-2 lg:grid-cols-3">

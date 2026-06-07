@@ -176,7 +176,8 @@ export const POLICIES: Policy[] = [
       {
         severity: "medium",
         title: "Investor signal",
-        detail: "May modestly cool private investment if combined with other landlord-cost increases.",
+        detail:
+          "May modestly cool private investment if combined with other landlord-cost increases.",
       },
     ],
     recommendedBundle: ["fastApprovals"],
@@ -218,7 +219,8 @@ export const POLICIES: Policy[] = [
       },
     ],
     recommendedBundle: ["landSupply", "vacancyTax"],
-    bundleRationale: "Couple approval speed with land supply and idle-unit activation for compounding effect.",
+    bundleRationale:
+      "Couple approval speed with land supply and idle-unit activation for compounding effect.",
   },
   {
     id: "landSupply",
@@ -306,7 +308,8 @@ export const POLICIES: Policy[] = [
       },
     ],
     recommendedBundle: ["fastApprovals", "landSupply"],
-    bundleRationale: "Couple incentive with land and approval speed so capital can actually deploy.",
+    bundleRationale:
+      "Couple incentive with land and approval speed so capital can actually deploy.",
   },
 ];
 

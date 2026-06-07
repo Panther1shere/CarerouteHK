@@ -42,9 +42,21 @@ export function SiteFooter() {
             Navigation
           </div>
           <ul className="space-y-2 text-muted-foreground">
-            <li><Link to="/" className="transition hover:text-foreground">Simulator</Link></li>
-            <li><Link to="/about" className="transition hover:text-foreground">Method</Link></li>
-            <li><Link to="/use-cases" className="transition hover:text-foreground">Roadmap</Link></li>
+            <li>
+              <Link to="/" className="transition hover:text-foreground">
+                Simulator
+              </Link>
+            </li>
+            <li>
+              <Link to="/about" className="transition hover:text-foreground">
+                Method
+              </Link>
+            </li>
+            <li>
+              <Link to="/use-cases" className="transition hover:text-foreground">
+                Roadmap
+              </Link>
+            </li>
           </ul>
         </div>
         <div className="text-sm text-muted-foreground">

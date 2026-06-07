@@ -6,14 +6,9 @@ import { useWizard } from "./wizard-context";
 import { chatWithContext } from "@/lib/policygraph/analyze.functions";
 
 export function Chatbot() {
-<<<<<<< HEAD
-  const { step, query, horizon, analysis, selectedDatasets, chatMessages, setChatMessages } = useWizard();
-  const [open, setOpen] = useState(false);
-=======
   const { step, query, horizon, analysis, selectedDatasets, chatMessages, setChatMessages } =
     useWizard();
-  const [open, setOpen] = useState(true);
->>>>>>> 7a19f56 (added the small thing)
+  const [open, setOpen] = useState(false);
   const [input, setInput] = useState("");
   const scrollRef = useRef<HTMLDivElement>(null);
   const fn = useServerFn(chatWithContext);

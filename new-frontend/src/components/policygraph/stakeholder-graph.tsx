@@ -32,7 +32,10 @@ export function StakeholderGraph({ affected }: Props) {
         {/* connection lines from hub-like centroid */}
         {active.map((a, i) =>
           active.slice(i + 1).map((b) => {
-            const intensity = Math.min(1, Math.abs(affected[a.id]) * Math.abs(affected[b.id]) + 0.05);
+            const intensity = Math.min(
+              1,
+              Math.abs(affected[a.id]) * Math.abs(affected[b.id]) + 0.05,
+            );
             return (
               <motion.line
                 key={`${a.id}-${b.id}`}
@@ -48,14 +51,15 @@ export function StakeholderGraph({ affected }: Props) {
                 transition={{ duration: 0.8, delay: 0.1 }}
               />
             );
-          })
+          }),
         )}
 
         {positions.map((p, i) => {
           const w = affected[p.id] ?? 0;
           const isActive = Math.abs(w) > 0.05;
           const radius = isActive ? 22 + Math.abs(w) * 18 : 14;
-          const fill = w > 0 ? "var(--color-amber)" : w < 0 ? "var(--color-coral)" : "var(--color-surface-2)";
+          const fill =
+            w > 0 ? "var(--color-amber)" : w < 0 ? "var(--color-coral)" : "var(--color-surface-2)";
           return (
             <motion.g
               key={p.id}
@@ -63,13 +67,7 @@ export function StakeholderGraph({ affected }: Props) {
               animate={{ scale: 1, opacity: 1 }}
               transition={{ delay: 0.03 * i, type: "spring", stiffness: 180, damping: 18 }}
             >
-              <circle
-                cx={p.x}
-                cy={p.y}
-                r={radius + 8}
-                fill={fill}
-                opacity={isActive ? 0.18 : 0}
-              />
+              <circle cx={p.x} cy={p.y} r={radius + 8} fill={fill} opacity={isActive ? 0.18 : 0} />
               <circle
                 cx={p.x}
                 cy={p.y}

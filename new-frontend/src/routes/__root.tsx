@@ -86,8 +86,7 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
       { property: "og:title", content: "PolicyGraph HK" },
       {
         property: "og:description",
-        content:
-          "A policy flight simulator for Hong Kong housing. See the system before you act.",
+        content: "A policy flight simulator for Hong Kong housing. See the system before you act.",
       },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary_large_image" },

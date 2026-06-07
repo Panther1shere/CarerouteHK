@@ -77,7 +77,8 @@ export function StakeholderCard({
                         rel="noopener noreferrer"
                         className="mt-1 inline-flex items-center gap-1 font-mono text-[10px] text-primary hover:underline"
                       >
-                        source: {row.source.length > 60 ? row.source.slice(0, 60) + "…" : row.source}
+                        source:{" "}
+                        {row.source.length > 60 ? row.source.slice(0, 60) + "…" : row.source}
                         {row.source.startsWith("http") && <ExternalLink className="h-3 w-3" />}
                       </a>
                     )}

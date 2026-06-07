@@ -2,7 +2,10 @@ import { createContext, useContext, useEffect, useState, type ReactNode } from "
 import type { Dataset, PolicyAnalysis } from "@/lib/policygraph/analyze.functions";
 
 export type Horizon = "short" | "long";
-export interface ChatMsg { role: "user" | "assistant"; content: string }
+export interface ChatMsg {
+  role: "user" | "assistant";
+  content: string;
+}
 export interface CustomStakeholder {
   label: string;
   level: "micro" | "meso" | "macro";
@@ -62,7 +65,9 @@ export function WizardProvider({ children }: { children: ReactNode }) {
         if (v.customStakeholders) setCustomStakeholders(v.customStakeholders);
         if (v.chatMessages) setChatMessages(v.chatMessages);
       }
-    } catch {}
+    } catch (error) {
+      console.warn("Failed to hydrate wizard state.", error);
+    }
     setHydrated(true);
   }, []);
 
@@ -73,27 +78,71 @@ export function WizardProvider({ children }: { children: ReactNode }) {
       sessionStorage.setItem(
         KEY,
         JSON.stringify({
-          step, query, horizon, draftText, analysis, bundleAnalysis,
-          selectedDatasets, customStakeholders, chatMessages,
-        })
+          step,
+          query,
+          horizon,
+          draftText,
+          analysis,
+          bundleAnalysis,
+          selectedDatasets,
+          customStakeholders,
+          chatMessages,
+        }),
       );
-    } catch {}
-  }, [hydrated, step, query, horizon, draftText, analysis, bundleAnalysis, selectedDatasets, customStakeholders, chatMessages]);
+    } catch (error) {
+      console.warn("Failed to persist wizard state.", error);
+    }
+  }, [
+    hydrated,
+    step,
+    query,
+    horizon,
+    draftText,
+    analysis,
+    bundleAnalysis,
+    selectedDatasets,
+    customStakeholders,
+    chatMessages,
+  ]);
 
   const reset = () => {
-    setStep(1); setQuery(""); setDraftText(""); setAnalysis(null);
-    setBundleAnalysis(null); setSelectedDatasets([]); setCustomStakeholders([]);
+    setStep(1);
+    setQuery("");
+    setDraftText("");
+    setAnalysis(null);
+    setBundleAnalysis(null);
+    setSelectedDatasets([]);
+    setCustomStakeholders([]);
     setChatMessages([]);
-    try { sessionStorage.removeItem(KEY); } catch {}
+    try {
+      sessionStorage.removeItem(KEY);
+    } catch (error) {
+      console.warn("Failed to clear wizard state.", error);
+    }
   };
 
   return (
     <Ctx.Provider
       value={{
-        step, setStep, query, setQuery, horizon, setHorizon, draftText, setDraftText,
-        analysis, setAnalysis, bundleAnalysis, setBundleAnalysis,
-        selectedDatasets, setSelectedDatasets, customStakeholders, setCustomStakeholders,
-        chatMessages, setChatMessages, reset,
+        step,
+        setStep,
+        query,
+        setQuery,
+        horizon,
+        setHorizon,
+        draftText,
+        setDraftText,
+        analysis,
+        setAnalysis,
+        bundleAnalysis,
+        setBundleAnalysis,
+        selectedDatasets,
+        setSelectedDatasets,
+        customStakeholders,
+        setCustomStakeholders,
+        chatMessages,
+        setChatMessages,
+        reset,
       }}
     >
       {children}
