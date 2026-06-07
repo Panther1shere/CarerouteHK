@@ -43,7 +43,94 @@ export interface Dataset {
   query: string;
 }
 
+export interface GraphNode {
+  policy_node_id: number;
+  node_id?: number | null;
+  node_key?: string | null;
+  label: string;
+  description: string;
+  level: "Micro" | "Meso" | "Macro";
+  category: string;
+  related_stakeholder_ids: number[];
+  x?: number | null;
+  y?: number | null;
+  created_at?: string | null;
+  updated_at?: string | null;
+}
+
+export interface GraphEdge {
+  connection_id: number;
+  connection_key?: string | null;
+  policy_id?: number | null;
+  source_node_id: number;
+  target_node_id: number;
+  relationship_type: string;
+  explanation: string;
+  polarity: "+" | "-";
+  created_at?: string | null;
+  updated_at?: string | null;
+}
+
+export interface GraphFeedbackLoop {
+  feedback_loop_id: number;
+  loop_key?: string | null;
+  policy_id?: number | null;
+  loop_name: string;
+  involved_node_ids: number[];
+  involved_connection_ids: number[];
+  loop_type: "reinforcing" | "balancing";
+  explanation: string;
+  affected_stakeholder_ids: number[];
+  possible_intervention_points: string[];
+  created_at?: string | null;
+  updated_at?: string | null;
+}
+
+export interface GraphBoundary {
+  boundary_id?: number | null;
+  policy_id?: number | null;
+  system_purpose: string;
+  included_node_ids: number[];
+  excluded_or_external_factors: string[];
+  explanation: string;
+  created_at?: string | null;
+  updated_at?: string | null;
+}
+
+export interface GraphNote {
+  note_id: number;
+  related_object_type: string;
+  related_object_id?: number | null;
+  policy_id: number;
+  note_text: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface PolicyGraphPayload {
+  policy: {
+    policy_id: number;
+    text_preview: string;
+    policy_domain: string;
+    llm_model: string;
+    created_at: string;
+    stakeholder_count: number;
+    node_count: number;
+    connection_count: number;
+    feedback_loop_count: number;
+    note_count: number;
+  };
+  stakeholders: Array<Record<string, unknown>>;
+  nodes: GraphNode[];
+  edges: GraphEdge[];
+  feedbackLoops: GraphFeedbackLoop[];
+  systemBoundary?: GraphBoundary | null;
+  interventionPoints: string[];
+  notes: GraphNote[];
+}
+
 export interface PolicyAnalysis {
+  policyId?: number;
   interpretation: string;
   policy: { label: string; summary: string };
   stakeholders: Stakeholder[];
@@ -76,11 +163,23 @@ export interface PolicyAnalysis {
     short: string;
     description?: string;
     rationale?: string;
+    interventionKey?: string;
+    rank?: number;
+    targetedFeedbackLoopIds?: number[];
+    targetedNodeIds?: number[];
+    affectedStakeholderIds?: number[];
+    stakeholderFocus?: string[];
+    interventionPoints?: string[];
+    implementationNotes?: string[];
+    tradeoffs?: string[];
+    expectedSystemShift?: string;
+    confidence?: number;
   }>;
   bundleRationale: string;
   sources: Array<{ label: string; url: string }>;
   datasetUsage: string;
   datasets: Dataset[];
+  graph?: PolicyGraphPayload;
 }
 
 function backendBaseUrl() {
@@ -122,20 +221,22 @@ export const analyzePolicy = createServerFn({ method: "POST" })
             label: z.string(),
             level: z.enum(["micro", "meso", "macro"]),
             note: z.string().optional(),
-          })
+          }),
         )
         .optional(),
-      selectedDatasets: z.array(
-        z.object({
-          id: z.string(),
-          title: z.string(),
-          organization: z.string(),
-          notes: z.string(),
-          url: z.string(),
-          query: z.string(),
-        })
-      ).optional(),
-    })
+      selectedDatasets: z
+        .array(
+          z.object({
+            id: z.string(),
+            title: z.string(),
+            organization: z.string(),
+            notes: z.string(),
+            url: z.string(),
+            query: z.string(),
+          }),
+        )
+        .optional(),
+    }),
   )
   .handler(async ({ data }) => {
     return requestBackend<PolicyAnalysis>("/api/frontend/policygraph/analyze", {
@@ -156,7 +257,7 @@ export const parseDraft = createServerFn({ method: "POST" })
       filename: z.string().min(1).max(255),
       mimeType: z.string().max(100),
       contentBase64: z.string().min(1).max(8_000_000),
-    })
+    }),
   )
   .handler(async ({ data }) => {
     const lower = data.filename.toLowerCase();
@@ -170,7 +271,7 @@ export const parseDraft = createServerFn({ method: "POST" })
 
     if (!isTexty) {
       throw new Error(
-        "Only text, markdown, or JSON drafts are supported for now. Please paste the text or upload a .txt / .md file."
+        "Only text, markdown, or JSON drafts are supported for now. Please paste the text or upload a .txt / .md file.",
       );
     }
     try {
@@ -189,19 +290,16 @@ export const searchDatasets = createServerFn({ method: "POST" })
     z.object({
       query: z.string().min(1).max(100),
       rows: z.number().min(1).max(10).optional(),
-    })
+    }),
   )
   .handler(async ({ data }) => {
-    return requestBackend<{ results: Dataset[] }>(
-      "/api/frontend/policygraph/datasets/search",
-      {
-        method: "POST",
-        body: JSON.stringify({
-          query: data.query,
-          rows: data.rows ?? 6,
-        }),
-      }
-    );
+    return requestBackend<{ results: Dataset[] }>("/api/frontend/policygraph/datasets/search", {
+      method: "POST",
+      body: JSON.stringify({
+        query: data.query,
+        rows: data.rows ?? 6,
+      }),
+    });
   });
 
 const ChatMsg = z.object({
@@ -218,9 +316,12 @@ export const chatWithContext = createServerFn({ method: "POST" })
         query: z.string().max(2000),
         horizon: z.enum(["short", "long"]).optional(),
         analysisSummary: z.string().max(20_000).optional(),
-        datasets: z.array(z.object({ title: z.string(), url: z.string() })).max(20).optional(),
+        datasets: z
+          .array(z.object({ title: z.string(), url: z.string() }))
+          .max(20)
+          .optional(),
       }),
-    })
+    }),
   )
   .handler(async ({ data }) => {
     return requestBackend<{ reply: string }>("/api/frontend/policygraph/chat", {
@@ -234,6 +335,62 @@ export const chatWithContext = createServerFn({ method: "POST" })
           analysis_summary: data.context.analysisSummary,
           datasets: data.context.datasets ?? [],
         },
+      }),
+    });
+  });
+
+export const addPolicyNote = createServerFn({ method: "POST" })
+  .validator(
+    z.object({
+      policyId: z.number().int().positive(),
+      relatedObjectType: z.string().min(1),
+      relatedObjectId: z.number().int().positive().optional(),
+      noteText: z.string().min(3),
+    }),
+  )
+  .handler(async ({ data }) => {
+    return requestBackend<GraphNote>(`/policy/${data.policyId}/notes`, {
+      method: "POST",
+      body: JSON.stringify({
+        related_object_type: data.relatedObjectType,
+        related_object_id: data.relatedObjectId ?? null,
+        note_text: data.noteText,
+      }),
+    });
+  });
+
+export const updatePolicyNote = createServerFn({ method: "POST" })
+  .validator(
+    z.object({
+      policyId: z.number().int().positive(),
+      noteId: z.number().int().positive(),
+      noteText: z.string().min(3),
+    }),
+  )
+  .handler(async ({ data }) => {
+    return requestBackend<GraphNote>(`/policy/${data.policyId}/notes/${data.noteId}`, {
+      method: "PUT",
+      body: JSON.stringify({
+        note_text: data.noteText,
+      }),
+    });
+  });
+
+export const updatePolicyNode = createServerFn({ method: "POST" })
+  .validator(
+    z.object({
+      policyId: z.number().int().positive(),
+      nodeId: z.number().int().positive(),
+      x: z.number().optional(),
+      y: z.number().optional(),
+    }),
+  )
+  .handler(async ({ data }) => {
+    return requestBackend<GraphNode>(`/policy/${data.policyId}/nodes/${data.nodeId}`, {
+      method: "PATCH",
+      body: JSON.stringify({
+        x: data.x,
+        y: data.y,
       }),
     });
   });

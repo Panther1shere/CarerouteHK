@@ -57,15 +57,35 @@ Return JSON that matches the provided schema exactly.
 
 Rules:
 - Do not hardcode any fixed stakeholder list or system map. Infer them dynamically from the policy text.
-- Focus on realistic stakeholders affected, involved, constrained, or empowered by the policy.
-- Build nodes that represent actors, resources, stocks, institutions, policy factors, and public outcomes.
+- Focus on realistic stakeholders and entities affected, involved, constrained, empowered, or made accountable by the policy.
+- Search for stakeholders as a real delivery problem: include decision owners, frontline implementers,
+  regulated market actors, vulnerable or indirectly affected residents, financing actors, enforcement bodies,
+  data owners, and opponents whose incentives could block the policy.
+- Exclude generic filler. Every stakeholder must explain a concrete motivation, constraint, resource dependency,
+  or accountability relationship that matters for implementation.
+- Build a system map that is useful for intervention design, not just a stakeholder inventory.
+- Build nodes that represent system stakeholders/entities affected by policy plus the resources, stocks,
+  institutions, bottlenecks, pressures, and public outcomes they influence.
+- Build 8 to 14 distinct nodes unless the policy is unusually simple.
+- Prefer concrete labels such as "Rent Level", "Construction Capacity", "Permit Delay", "Tenant Stress",
+  "Public Housing Supply", or "Land Availability" over vague labels such as "market issue".
 - Build connections that describe influence, dependency, conflict, cooperation, information flow,
   money flow, resource flow, or policy impact.
+- Each connection must show cause and effect: how the source changes the target, which stakeholder/entity is affected,
+  and why that matters for the policy outcome.
+- Avoid disconnected decorative edges. Every connection must help explain a real ripple effect or implementation risk.
 - Connections must use polarity "+" or "-" only, never numeric strength values.
+- "+" means the source increases or strengthens the target. "-" means the source reduces or weakens the target.
 - Detect feedback loops only when they are meaningfully grounded in the policy and generated nodes.
+- If the policy implies a cycle, make that cycle explicit through the nodes, connections, and saved feedback loops.
+- Feedback loops should capture the cycles that matter for later intervention design.
+- Possible intervention points must be specific policy, regulatory, funding, enforcement, data-sharing,
+  sequencing, or delivery levers. Name the exact node or relationship they are meant to change.
+- The full map should let a decision-maker trace: policy lever -> affected node/entity -> downstream nodes ->
+  feedback loop or public outcome.
 - Write short but meaningful fields, usually one to three sentences each.
 - If a stakeholder does not have a corporate structure, explain the closest equivalent plainly.
-- The system boundary should explain what is inside the system, what is outside it, and why.
+- Do not generate a separate system boundary section.
 - The policy domain should be treated as housing unless the policy text clearly broadens scope.
 """
 
@@ -250,6 +270,37 @@ class PolicyAnalysisService:
     async def delete_policy(self, policy_id: int) -> PolicyDeleteResponse:
         return await self.repository.delete_policy(policy_id)
 
+    async def update_note(
+        self, policy_id: int, note_id: int, note_text: str
+    ) -> PolicyNoteResponse:
+        return await self.repository.update_note(
+            policy_id=policy_id, note_id=note_id, note_text=note_text
+        )
+
+    async def update_policy_node(
+        self, policy_id: int, node_id: int, payload: dict
+    ) -> PolicySystemNode:
+        return await self.repository.update_policy_node(policy_id, node_id, payload)
+
+    async def update_policy_connection(
+        self, policy_id: int, connection_id: int, payload: dict
+    ) -> PolicySystemConnection:
+        return await self.repository.update_policy_connection(
+            policy_id, connection_id, payload
+        )
+
+    async def update_policy_feedback_loop(
+        self, policy_id: int, feedback_loop_id: int, payload: dict
+    ) -> PolicyFeedbackLoop:
+        return await self.repository.update_policy_feedback_loop(
+            policy_id, feedback_loop_id, payload
+        )
+
+    async def update_policy_boundary(
+        self, policy_id: int, payload: dict
+    ) -> PolicySystemBoundary:
+        return await self.repository.update_policy_boundary(policy_id, payload)
+
     async def get_policy_intervention_analysis(
         self, policy_id: int
     ) -> PolicyInterventionAnalysisResponse:
@@ -302,6 +353,13 @@ class PolicyAnalysisService:
         datasets: list[FrontendDataset],
     ) -> str:
         sections = [f"Policy query: {payload.query.strip()}"]
+        sections.append(
+            "Stakeholder and causal-map discovery brief:\n"
+            "- Identify concrete Hong Kong actors and entities whose incentives, constraints, or decisions shape implementation.\n"
+            "- Prioritize real-world bottlenecks, accountability gaps, delivery dependencies, vulnerable groups, market responses, and enforcement risks.\n"
+            "- Make each node and connection useful for deciding where to intervene; avoid generic labels and unsupported relationships.\n"
+            "- Show the ripple effect from policy lever to affected entities, downstream system behavior, and eventual public outcomes."
+        )
         if payload.horizon:
             sections.append(f"Horizon emphasis: {payload.horizon}")
         if payload.draft_text:
@@ -429,6 +487,7 @@ class PolicyAnalysisService:
         label = self._derive_policy_label(query)
         summary = self._derive_policy_summary(query, policy)
         return FrontendPolicyAnalysisResponse(
+            policy_id=policy.policy_id,
             interpretation=self._build_frontend_interpretation(policy, intervention_analysis),
             policy=FrontendPolicySummary(label=label, summary=summary),
             stakeholders=stakeholders,
@@ -444,6 +503,27 @@ class PolicyAnalysisService:
             ],
             datasetUsage=self._build_dataset_usage(datasets),
             datasets=datasets,
+            graph=PolicyGraphResponse(
+                policy=PolicySummaryResponse(
+                    policy_id=policy.policy_id,
+                    text_preview=self._clean_phrase(policy.text)[:120],
+                    policy_domain=policy.policy_domain,
+                    llm_model=policy.llm_model,
+                    created_at=policy.created_at,
+                    stakeholder_count=len(policy.stakeholders),
+                    node_count=len(policy.nodes),
+                    connection_count=len(policy.connections),
+                    feedback_loop_count=len(policy.feedback_loops),
+                    note_count=len(policy.notes),
+                ),
+                stakeholders=policy.stakeholders,
+                nodes=policy.nodes,
+                edges=policy.connections,
+                feedback_loops=policy.feedback_loops,
+                system_boundary=policy.system_boundary,
+                intervention_points=policy.possible_intervention_points,
+                notes=policy.notes,
+            ),
         )
 
     def _build_frontend_interpretation(
@@ -473,8 +553,8 @@ class PolicyAnalysisService:
         if len(excerpt) > 180:
             excerpt = excerpt[:177].rstrip() + "..."
         return (
-            f"{excerpt} This is interpreted inside the system boundary: "
-            f"{self._clean_phrase(policy.system_boundary.system_purpose).lower()}."
+            f"{excerpt} This is interpreted as a causal housing system with stakeholder pressure, "
+            "delivery bottlenecks, and feedback loops that shape outcomes."
         )
 
     def _build_frontend_stakeholders(
@@ -753,7 +833,10 @@ class PolicyAnalysisService:
                 FrontendWarning(
                     severity="medium",
                     title="Policy execution risk",
-                    detail=policy.system_boundary.explanation,
+                    detail=(
+                        "The current map still needs analyst review for missing causal links, "
+                        "delivery constraints, and stakeholder resistance before implementation."
+                    ),
                 )
             )
         if len(warnings) == 1:
@@ -782,6 +865,17 @@ class PolicyAnalysisService:
                     short=recommendation.intervention_key[:24],
                     description=recommendation.recommended_action,
                     rationale=recommendation.reason,
+                    intervention_key=recommendation.intervention_key,
+                    rank=recommendation.rank,
+                    targeted_feedback_loop_ids=recommendation.targeted_feedback_loop_ids,
+                    targeted_node_ids=recommendation.targeted_node_ids,
+                    affected_stakeholder_ids=recommendation.affected_stakeholder_ids,
+                    stakeholder_focus=recommendation.stakeholder_focus,
+                    intervention_points=[recommendation.title],
+                    implementation_notes=recommendation.implementation_notes,
+                    tradeoffs=recommendation.tradeoffs,
+                    expected_system_shift=recommendation.expected_system_shift,
+                    confidence=recommendation.confidence,
                 )
             )
         for suggestion in enhancement_analysis.suggestions[:1]:
@@ -791,6 +885,16 @@ class PolicyAnalysisService:
                     short=suggestion.enhancement_key[:24],
                     description=suggestion.what_to_add,
                     rationale=suggestion.reason,
+                    intervention_key=suggestion.enhancement_key,
+                    rank=suggestion.rank,
+                    targeted_feedback_loop_ids=suggestion.based_on_feedback_loop_ids,
+                    targeted_node_ids=suggestion.based_on_node_ids,
+                    affected_stakeholder_ids=suggestion.affected_stakeholder_ids,
+                    stakeholder_focus=suggestion.affected_stakeholders,
+                    intervention_points=[suggestion.suggested_policy_section],
+                    implementation_notes=[suggestion.expected_policy_effect],
+                    tradeoffs=suggestion.risks_if_omitted,
+                    expected_system_shift=suggestion.expected_policy_effect,
                 )
             )
         return items[:4]
@@ -1069,23 +1173,21 @@ class PolicyAnalysisService:
         if not recommendations:
             return (
                 f"No strong intervention recommendation could be derived for policy {policy.policy_id}. "
-                f"Manual review is still required against the system purpose: "
-                f"{policy.system_boundary.system_purpose}."
+                "Manual review is still required against the saved nodes, loops, and stakeholder pressures."
             )
         top = recommendations[0]
         loop_count = len(policy.feedback_loops)
-        boundary_purpose = self._clean_phrase(policy.system_boundary.system_purpose)
         if loop_count == 0:
             return (
                 f"Prioritize {top.title} first. No explicit feedback loops were captured in the saved map, "
-                f"so this ranking is grounded in node centrality, stakeholder exposure, and alignment with "
-                f"the system purpose: {boundary_purpose}."
+                "so this ranking is grounded in node centrality, stakeholder exposure, and the strongest "
+                "causal pressure points in the graph."
             )
         return (
             f"Prioritize {top.title} first. It has the strongest grounding in the current system map "
             f"because it addresses {len(top.targeted_feedback_loop_ids)} feedback loop(s), focuses on "
-            f"{len(top.affected_stakeholder_ids)} stakeholder group(s), and aligns with the system purpose: "
-            f"{boundary_purpose}. The current policy map contains "
+            f"{len(top.affected_stakeholder_ids)} stakeholder group(s), and acts on the most connected pressure "
+            f"nodes. The current policy map contains "
             f"{loop_count} feedback loop(s), so intervention design should stay tightly tied to the saved evidence."
         )
 
@@ -1126,9 +1228,7 @@ class PolicyAnalysisService:
         notes_by_type: dict[str, list[PolicyNoteResponse]],
         intervention_title: str,
     ) -> list[str]:
-        evidence = [
-            f"System purpose: {self._clean_phrase(policy.system_boundary.system_purpose)}.",
-        ]
+        evidence = []
         for loop in loops[:2]:
             evidence.append(f"Loop signal: {self._clean_phrase(loop.explanation)}.")
         for node in nodes[:2]:
@@ -1172,7 +1272,7 @@ class PolicyAnalysisService:
             )
         if not notes:
             notes.append(
-                f"Implement against the system boundary goal: {policy.system_boundary.system_purpose}."
+                "Implement against the highest-pressure nodes first and review the map after each policy change."
             )
         return notes[:5]
 
@@ -1199,7 +1299,7 @@ class PolicyAnalysisService:
                 )
         if not tradeoffs:
             tradeoffs.append(
-                f"Any intervention still has to stay inside the system boundary defined for policy {policy.policy_id}."
+                "Any intervention should still be checked for second-order effects on the rest of the saved graph."
             )
         return tradeoffs[:5]
 
@@ -1236,11 +1336,10 @@ class PolicyAnalysisService:
             if stakeholders
             else "the currently mapped stakeholders"
         )
-        boundary_purpose = self._clean_phrase(policy.system_boundary.system_purpose)
         return (
             f"We are recommending {title.lower()} because it directly addresses {loop_phrase}, "
             f"which is pushing pressure through {node_phrase}. That matters for {stakeholder_phrase}, "
-            f"and it is consistent with the system purpose: {boundary_purpose}."
+            "and it changes a leverage point that can shift the wider system rather than a single isolated symptom."
         )
 
     def _build_expected_shift(
@@ -1254,12 +1353,12 @@ class PolicyAnalysisService:
             return (
                 f"Expected shift: reduce reinforcing pressure across "
                 f"{', '.join(node.label for node in nodes[:2]) if nodes else 'the highest-pressure nodes'} "
-                f"while keeping the system aligned with {self._clean_phrase(policy.system_boundary.system_purpose).lower()}."
+                "so the cycle stops amplifying itself."
             )
         return (
             f"Expected shift: stabilize execution around "
             f"{', '.join(node.label for node in nodes[:2]) if nodes else 'the mapped nodes'} "
-            f"and protect the system boundary objective."
+            "and reduce oscillation in the delivery path."
         )
 
     def _rank_intervention(

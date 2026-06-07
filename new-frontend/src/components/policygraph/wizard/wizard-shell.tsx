@@ -1,3 +1,4 @@
+import { useEffect, useState } from "react";
 import { WizardProvider, useWizard } from "./wizard-context";
 import { Step1PolicyInput } from "./step1-policy-input";
 import { Step2Stakeholders } from "./step2-stakeholders";
@@ -17,52 +18,74 @@ const STEPS = [
 
 function StepIndicator() {
   const w = useWizard();
+  const [compact, setCompact] = useState(false);
+
+  useEffect(() => {
+    const updateCompact = () => setCompact(window.scrollY > 120);
+    updateCompact();
+    window.addEventListener("scroll", updateCompact, { passive: true });
+    return () => window.removeEventListener("scroll", updateCompact);
+  }, []);
+
   return (
-    <div className="border-b hairline bg-background/80 backdrop-blur">
-      <div className="mx-auto flex max-w-6xl items-center gap-2 overflow-x-auto px-6 py-4">
-        {STEPS.map((s, i) => {
-          const done = w.step > s.n;
-          const active = w.step === s.n;
-          const reachable =
-            s.n === 1 ||
-            (s.n <= 2 && !!w.analysis) ||
-            (s.n <= 3 && !!w.analysis) ||
-            (s.n <= 4 && !!w.analysis) ||
-            (s.n === 5 && !!w.bundleAnalysis);
-          return (
-            <div key={s.n} className="flex shrink-0 items-center gap-2">
-              <button
-                onClick={() => reachable && w.setStep(s.n)}
-                disabled={!reachable}
-                className={`flex items-center gap-2 rounded-full px-3 py-1.5 text-xs font-medium transition ${
-                  active
-                    ? "bg-primary text-primary-foreground"
-                    : done
-                    ? "border border-primary/40 text-primary"
-                    : reachable
-                    ? "border hairline text-muted-foreground hover:text-foreground"
-                    : "border hairline text-muted-foreground/50 cursor-not-allowed"
-                }`}
-              >
-                <span
-                  className={`grid h-5 w-5 place-items-center rounded-full text-[10px] font-mono ${
+    <div className="sticky top-[92px] z-20 border-b hairline bg-white/86 backdrop-blur-xl transition-all md:top-[104px]">
+      <div className={`mx-auto max-w-7xl px-7 transition-all ${compact ? "py-2.5" : "py-5"}`}>
+        <div
+          className={`overflow-hidden font-mono text-[10px] uppercase tracking-[0.24em] text-primary/78 transition-all ${
+            compact ? "mb-0 max-h-0 opacity-0" : "mb-3 max-h-5 opacity-100"
+          }`}
+        >
+          Housing policy workflow
+        </div>
+        <div className="flex items-center gap-2 overflow-x-auto">
+          {STEPS.map((s, i) => {
+            const done = w.step > s.n;
+            const active = w.step === s.n;
+            const reachable =
+              s.n === 1 ||
+              (s.n <= 2 && !!w.analysis) ||
+              (s.n <= 3 && !!w.analysis) ||
+              (s.n <= 4 && !!w.analysis) ||
+              (s.n === 5 && !!w.bundleAnalysis);
+            return (
+              <div key={s.n} className="flex shrink-0 items-center gap-2">
+                <button
+                  onClick={() => reachable && w.setStep(s.n)}
+                  disabled={!reachable}
+                  aria-label={`Step ${s.n}: ${s.label}`}
+                  title={s.label}
+                  className={`flex items-center gap-2 rounded-full border text-xs font-medium uppercase tracking-[0.12em] transition ${
                     active
-                      ? "bg-primary-foreground/20"
+                      ? "border-primary bg-primary text-primary-foreground shadow-[0_10px_20px_rgba(15,23,42,0.08)]"
                       : done
-                      ? "bg-primary/15"
-                      : "border hairline"
-                  }`}
+                        ? "border-primary/22 bg-primary/6 text-primary"
+                        : reachable
+                          ? "hairline bg-white text-muted-foreground hover:border-primary/20 hover:text-foreground"
+                          : "hairline bg-white/55 text-muted-foreground/50 cursor-not-allowed"
+                  } ${compact ? "px-2.5 py-1.5" : "px-4 py-2"}`}
                 >
-                  {done ? <Check className="h-3 w-3" /> : s.n}
-                </span>
-                {s.label}
-              </button>
-              {i < STEPS.length - 1 && (
-                <span className={`h-px w-6 ${done ? "bg-primary/50" : "bg-hairline"}`} />
-              )}
-            </div>
-          );
-        })}
+                  <span
+                    className={`grid place-items-center rounded-full text-[10px] font-mono transition-all ${
+                      active
+                        ? "bg-primary-foreground/18"
+                        : done
+                          ? "bg-primary/12"
+                          : "border hairline bg-white"
+                    } ${compact ? "h-6 w-6" : "h-5 w-5"}`}
+                  >
+                    {done ? <Check className="h-3 w-3" /> : s.n}
+                  </span>
+                  <span className={compact ? "sr-only" : ""}>{s.label}</span>
+                </button>
+                {i < STEPS.length - 1 && (
+                  <span
+                    className={`h-px transition-all ${compact ? "w-4" : "w-8"} ${done ? "bg-primary/32" : "bg-hairline"}`}
+                  />
+                )}
+              </div>
+            );
+          })}
+        </div>
       </div>
     </div>
   );
@@ -71,7 +94,7 @@ function StepIndicator() {
 function StepContent() {
   const w = useWizard();
   return (
-    <div className="px-6 py-10">
+    <div className="px-7 py-9">
       {w.step === 1 && <Step1PolicyInput />}
       {w.step === 2 && <Step2Stakeholders />}
       {w.step === 3 && <Step3SystemMap />}

@@ -1,4 +1,4 @@
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 
 class MetricCard(BaseModel):
@@ -221,6 +221,10 @@ class PolicySystemNode(BaseModel):
     level: str = Field(pattern="^(Micro|Meso|Macro)$")
     category: str
     related_stakeholder_ids: list[int] = Field(default_factory=list)
+    x: float | None = None
+    y: float | None = None
+    created_at: str | None = None
+    updated_at: str | None = None
 
 
 class PolicySystemConnection(BaseModel):
@@ -232,6 +236,8 @@ class PolicySystemConnection(BaseModel):
     relationship_type: str
     explanation: str
     polarity: str = Field(pattern=r"^(\+|-)$")
+    created_at: str | None = None
+    updated_at: str | None = None
 
 
 class PolicyFeedbackLoop(BaseModel):
@@ -245,6 +251,8 @@ class PolicyFeedbackLoop(BaseModel):
     explanation: str
     affected_stakeholder_ids: list[int]
     possible_intervention_points: list[str]
+    created_at: str | None = None
+    updated_at: str | None = None
 
 
 class PolicySystemBoundary(BaseModel):
@@ -254,6 +262,8 @@ class PolicySystemBoundary(BaseModel):
     included_node_ids: list[int]
     excluded_or_external_factors: list[str]
     explanation: str
+    created_at: str | None = None
+    updated_at: str | None = None
 
 
 class PolicyNoteCreateRequest(BaseModel):
@@ -274,6 +284,41 @@ class PolicyNoteResponse(BaseModel):
     updated_at: str
 
 
+class PolicyNoteUpdateRequest(BaseModel):
+    note_text: str = Field(min_length=3)
+
+
+class PolicyNodeUpdateRequest(BaseModel):
+    label: str | None = None
+    description: str | None = None
+    level: str | None = Field(default=None, pattern="^(Micro|Meso|Macro)$")
+    category: str | None = None
+    related_stakeholder_ids: list[int] | None = None
+    x: float | None = None
+    y: float | None = None
+
+
+class PolicyConnectionUpdateRequest(BaseModel):
+    relationship_type: str | None = None
+    explanation: str | None = None
+    polarity: str | None = Field(default=None, pattern=r"^(\+|-)$")
+
+
+class PolicyFeedbackLoopUpdateRequest(BaseModel):
+    loop_name: str | None = None
+    loop_type: str | None = Field(default=None, pattern="^(reinforcing|balancing)$")
+    explanation: str | None = None
+    affected_stakeholder_ids: list[int] | None = None
+    possible_intervention_points: list[str] | None = None
+
+
+class PolicyBoundaryUpdateRequest(BaseModel):
+    system_purpose: str | None = None
+    included_node_ids: list[int] | None = None
+    excluded_or_external_factors: list[str] | None = None
+    explanation: str | None = None
+
+
 class PolicyAnalysisResponse(BaseModel):
     policy_id: int
     text: str
@@ -284,7 +329,7 @@ class PolicyAnalysisResponse(BaseModel):
     nodes: list[PolicySystemNode]
     connections: list[PolicySystemConnection]
     feedback_loops: list[PolicyFeedbackLoop]
-    system_boundary: PolicySystemBoundary
+    system_boundary: PolicySystemBoundary | None = None
     notes: list[PolicyNoteResponse]
     possible_intervention_points: list[str]
 
@@ -323,13 +368,22 @@ class PolicyDeleteResponse(BaseModel):
 
 
 class PolicyGraphResponse(BaseModel):
+    model_config = ConfigDict(populate_by_name=True)
+
     policy: PolicySummaryResponse
     nodes: list[PolicySystemNode]
     edges: list[PolicySystemConnection]
-    feedback_loops: list[PolicyFeedbackLoop]
+    feedback_loops: list[PolicyFeedbackLoop] = Field(
+        serialization_alias="feedbackLoops"
+    )
     stakeholders: list[PolicyStakeholderAnalysis]
-    boundary: PolicySystemBoundary | None = None
-    intervention_points: list[str]
+    system_boundary: PolicySystemBoundary | None = Field(
+        default=None, serialization_alias="systemBoundary"
+    )
+    intervention_points: list[str] = Field(
+        default_factory=list, serialization_alias="interventionPoints"
+    )
+    notes: list[PolicyNoteResponse] = Field(default_factory=list)
 
 
 class PolicyInterventionRecommendation(BaseModel):
@@ -434,7 +488,7 @@ class PolicyAnalysisLLMEnvelope(BaseModel):
     nodes: list[PolicySystemMapNodeInput] = Field(min_length=1)
     connections: list[PolicySystemMapConnectionInput] = Field(default_factory=list)
     feedback_loops: list[PolicySystemMapFeedbackLoopInput] = Field(default_factory=list)
-    system_boundary: PolicySystemBoundaryInput
+    system_boundary: PolicySystemBoundaryInput | None = None
 
 
 class FrontendDataset(BaseModel):
@@ -515,6 +569,31 @@ class FrontendBundleItem(BaseModel):
     short: str
     description: str | None = None
     rationale: str | None = None
+    intervention_key: str | None = Field(default=None, serialization_alias="interventionKey")
+    rank: int | None = None
+    targeted_feedback_loop_ids: list[int] = Field(
+        default_factory=list, serialization_alias="targetedFeedbackLoopIds"
+    )
+    targeted_node_ids: list[int] = Field(
+        default_factory=list, serialization_alias="targetedNodeIds"
+    )
+    affected_stakeholder_ids: list[int] = Field(
+        default_factory=list, serialization_alias="affectedStakeholderIds"
+    )
+    stakeholder_focus: list[str] = Field(
+        default_factory=list, serialization_alias="stakeholderFocus"
+    )
+    intervention_points: list[str] = Field(
+        default_factory=list, serialization_alias="interventionPoints"
+    )
+    implementation_notes: list[str] = Field(
+        default_factory=list, serialization_alias="implementationNotes"
+    )
+    tradeoffs: list[str] = Field(default_factory=list)
+    expected_system_shift: str | None = Field(
+        default=None, serialization_alias="expectedSystemShift"
+    )
+    confidence: float | None = None
 
 
 class FrontendPolicySummary(BaseModel):
@@ -523,6 +602,9 @@ class FrontendPolicySummary(BaseModel):
 
 
 class FrontendPolicyAnalysisResponse(BaseModel):
+    model_config = ConfigDict(populate_by_name=True)
+
+    policy_id: int = Field(serialization_alias="policyId")
     interpretation: str
     policy: FrontendPolicySummary
     stakeholders: list[FrontendStakeholder]
@@ -535,6 +617,7 @@ class FrontendPolicyAnalysisResponse(BaseModel):
     sources: list[dict[str, str]]
     datasetUsage: str
     datasets: list[FrontendDataset]
+    graph: PolicyGraphResponse | None = None
 
 
 class FrontendDatasetSearchRequest(BaseModel):

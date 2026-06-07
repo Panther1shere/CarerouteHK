@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useMutation } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
-import { Search, Loader2, Plus, X, ExternalLink, Check } from "lucide-react";
+import { Search, Loader2, Plus, X, ExternalLink, Check, Database } from "lucide-react";
 import { useWizard } from "./wizard-context";
 import { searchDatasets, type Dataset } from "@/lib/policygraph/analyze.functions";
 
@@ -31,42 +31,69 @@ export function DatasetPicker() {
       <div>
         <h3 className="font-display text-2xl font-semibold">Data sources from data.gov.hk</h3>
         <p className="text-sm text-muted-foreground">
-          The model suggested these datasets. Curate them — uncheck any that don't fit, or
-          search and add more. Step 3 will pull live records from your selection.
+          The model suggested these datasets. Curate them — uncheck any that don't fit, or search
+          and add more. Step 3 will pull live records from your selection.
         </p>
       </div>
 
-      <div className="space-y-2">
+      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
         {suggested.map((d) => {
           const checked = selectedIds.has(d.id);
           return (
             <button
               key={d.id}
               onClick={() => toggle(d)}
-              className={`flex w-full items-start gap-3 rounded-xl border p-3 text-left transition ${
-                checked ? "border-primary bg-primary/5" : "hairline bg-background/40 hover:border-primary/50"
+              className={`group relative min-h-[150px] rounded-2xl border p-4 text-left transition ${
+                checked
+                  ? "border-primary bg-primary/6 shadow-[0_14px_28px_rgba(29,78,216,0.08)]"
+                  : "hairline bg-background/55 hover:border-primary/40 hover:bg-white"
               }`}
             >
-              <div
-                className={`mt-0.5 grid h-4 w-4 shrink-0 place-items-center rounded border ${
-                  checked ? "border-primary bg-primary text-primary-foreground" : "hairline"
-                }`}
-              >
-                {checked && <Check className="h-3 w-3" />}
-              </div>
-              <div className="min-w-0 flex-1">
-                <div className="font-mono text-[10px] uppercase tracking-wider text-muted-foreground">
-                  {d.organization} · query: "{d.query}"
+              <div className="flex items-start justify-between gap-3">
+                <div className="flex items-center gap-2">
+                  <div
+                    className={`grid h-9 w-9 place-items-center rounded-xl border ${
+                      checked
+                        ? "border-primary/25 bg-primary/10 text-primary"
+                        : "hairline bg-white text-muted-foreground"
+                    }`}
+                  >
+                    <Database className="h-4 w-4" />
+                  </div>
+                  <div className="min-w-0">
+                    <div className="font-mono text-[10px] uppercase tracking-wider text-muted-foreground">
+                      {d.organization}
+                    </div>
+                    <div className="mt-0.5 max-w-[13rem] truncate text-[11px] text-primary/75">
+                      query: "{d.query}"
+                    </div>
+                  </div>
                 </div>
-                <div className="mt-0.5 font-semibold">{d.title}</div>
-                {d.notes && <p className="mt-1 line-clamp-2 text-xs text-muted-foreground">{d.notes}</p>}
+                <div
+                  className={`grid h-5 w-5 shrink-0 place-items-center rounded-full border ${
+                    checked
+                      ? "border-primary bg-primary text-primary-foreground"
+                      : "hairline bg-white"
+                  }`}
+                >
+                  {checked && <Check className="h-3 w-3" />}
+                </div>
               </div>
+              <div className="mt-4 font-display text-lg font-semibold leading-6 text-foreground">
+                {d.title}
+              </div>
+              {d.notes && (
+                <p className="mt-2 line-clamp-2 text-xs leading-5 text-muted-foreground">
+                  {d.notes}
+                </p>
+              )}
               <a
                 href={d.url}
                 target="_blank"
                 rel="noopener noreferrer"
                 onClick={(e) => e.stopPropagation()}
-                className="rounded p-1 text-muted-foreground hover:text-primary"
+                className="absolute bottom-3 right-3 rounded-full border hairline bg-white p-1.5 text-muted-foreground opacity-80 transition hover:text-primary group-hover:opacity-100"
+                aria-label={`Open ${d.title}`}
               >
                 <ExternalLink className="h-3.5 w-3.5" />
               </a>
@@ -80,7 +107,10 @@ export function DatasetPicker() {
           Search data.gov.hk for more datasets
         </div>
         <form
-          onSubmit={(e) => { e.preventDefault(); if (q.trim()) search.mutate(); }}
+          onSubmit={(e) => {
+            e.preventDefault();
+            if (q.trim()) search.mutate();
+          }}
           className="mt-2 flex gap-2"
         >
           <div className="relative flex-1">
@@ -97,7 +127,11 @@ export function DatasetPicker() {
             disabled={search.isPending || !q.trim()}
             className="inline-flex items-center gap-1.5 rounded-lg bg-primary px-3 py-2 text-sm font-medium text-primary-foreground disabled:opacity-60"
           >
-            {search.isPending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Search className="h-3.5 w-3.5" />}
+            {search.isPending ? (
+              <Loader2 className="h-3.5 w-3.5 animate-spin" />
+            ) : (
+              <Search className="h-3.5 w-3.5" />
+            )}
             Search
           </button>
         </form>
@@ -127,7 +161,9 @@ export function DatasetPicker() {
                     </button>
                   ) : (
                     <button
-                      onClick={() => { if (!inSuggested) w.setSelectedDatasets([...w.selectedDatasets, d]); }}
+                      onClick={() => {
+                        if (!inSuggested) w.setSelectedDatasets([...w.selectedDatasets, d]);
+                      }}
                       className="inline-flex items-center gap-1 rounded-full bg-primary px-2 py-1 text-[10px] text-primary-foreground"
                     >
                       <Plus className="h-3 w-3" /> Add

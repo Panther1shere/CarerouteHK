@@ -201,11 +201,15 @@ async def initialize_database() -> None:
                 id SERIAL PRIMARY KEY,
                 policy_document_id INTEGER NOT NULL REFERENCES policy_documents(id) ON DELETE CASCADE,
                 node_catalog_id INTEGER NOT NULL REFERENCES policy_system_node_catalog(id) ON DELETE CASCADE,
+                label TEXT NOT NULL,
                 description TEXT NOT NULL,
                 level TEXT NOT NULL,
                 category TEXT NOT NULL,
                 related_stakeholder_ids_json TEXT NOT NULL,
+                x_pos REAL,
+                y_pos REAL,
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 UNIQUE(policy_document_id, node_catalog_id)
             );
             """,
@@ -218,7 +222,8 @@ async def initialize_database() -> None:
                 relationship_type TEXT NOT NULL,
                 explanation TEXT NOT NULL,
                 polarity TEXT NOT NULL CHECK (polarity IN ('+', '-')),
-                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             );
             """,
             """
@@ -230,7 +235,8 @@ async def initialize_database() -> None:
                 explanation TEXT NOT NULL,
                 affected_stakeholder_ids_json TEXT NOT NULL,
                 possible_intervention_points_json TEXT NOT NULL,
-                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             );
             """,
             """
@@ -255,7 +261,8 @@ async def initialize_database() -> None:
                 included_node_ids_json TEXT NOT NULL,
                 excluded_or_external_factors_json TEXT NOT NULL,
                 explanation TEXT NOT NULL,
-                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             );
             """,
             """
@@ -286,6 +293,41 @@ async def initialize_database() -> None:
             """
             ALTER TABLE policy_stakeholder_analyses
             ADD COLUMN IF NOT EXISTS stakeholder_entity_id INTEGER REFERENCES stakeholder_entities(id) ON DELETE SET NULL;
+            """,
+            """
+            ALTER TABLE policy_system_nodes
+            ADD COLUMN IF NOT EXISTS label TEXT;
+            """,
+            """
+            UPDATE policy_system_nodes psn
+            SET label = pnc.label
+            FROM policy_system_node_catalog pnc
+            WHERE psn.node_catalog_id = pnc.id
+              AND psn.label IS NULL;
+            """,
+            """
+            ALTER TABLE policy_system_nodes
+            ADD COLUMN IF NOT EXISTS x_pos REAL;
+            """,
+            """
+            ALTER TABLE policy_system_nodes
+            ADD COLUMN IF NOT EXISTS y_pos REAL;
+            """,
+            """
+            ALTER TABLE policy_system_nodes
+            ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP;
+            """,
+            """
+            ALTER TABLE policy_system_connections
+            ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP;
+            """,
+            """
+            ALTER TABLE policy_feedback_loops
+            ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP;
+            """,
+            """
+            ALTER TABLE policy_system_boundaries
+            ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP;
             """,
         ]
 

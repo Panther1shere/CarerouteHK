@@ -15,14 +15,19 @@ from app.schemas import (
     PolicyAnalysisOnlyResponse,
     PolicyAnalysisRequest,
     PolicyAnalysisResponse,
+    PolicyBoundaryUpdateRequest,
+    PolicyConnectionUpdateRequest,
     PolicyDeleteResponse,
     PolicyEnhancementAnalysisResponse,
+    PolicyFeedbackLoopUpdateRequest,
     PolicyFeedbackLoop,
     PolicyGraphResponse,
     PolicyInterventionAnalysisResponse,
     PolicyInterventionPointsResponse,
     PolicyNoteCreateRequest,
     PolicyNoteResponse,
+    PolicyNoteUpdateRequest,
+    PolicyNodeUpdateRequest,
     PolicyStakeholderAnalysis,
     PolicySummaryResponse,
     PolicySystemBoundary,
@@ -155,6 +160,18 @@ async def create_policy_note(
     return await service.add_note(policy_id=policy_id, payload=payload)
 
 
+@router.put("/policy/{policy_id}/notes/{note_id}", response_model=PolicyNoteResponse)
+async def update_policy_note(
+    policy_id: int,
+    note_id: int,
+    payload: PolicyNoteUpdateRequest,
+    service: PolicyAnalysisService = Depends(get_policy_analysis_service),
+) -> PolicyNoteResponse:
+    return await service.update_note(
+        policy_id=policy_id, note_id=note_id, note_text=payload.note_text
+    )
+
+
 @router.get("/policy/{policy_id}/notes", response_model=list[PolicyNoteResponse])
 async def get_policy_notes(
     policy_id: int,
@@ -202,6 +219,59 @@ async def get_policy_graph(
     service: PolicyAnalysisService = Depends(get_policy_analysis_service),
 ) -> PolicyGraphResponse:
     return await service.get_policy_graph(policy_id)
+
+
+@router.patch("/policy/{policy_id}/nodes/{node_id}", response_model=PolicySystemNode)
+async def update_policy_node(
+    policy_id: int,
+    node_id: int,
+    payload: PolicyNodeUpdateRequest,
+    service: PolicyAnalysisService = Depends(get_policy_analysis_service),
+) -> PolicySystemNode:
+    return await service.update_policy_node(
+        policy_id, node_id, payload.model_dump(exclude_none=True)
+    )
+
+
+@router.patch(
+    "/policy/{policy_id}/connections/{connection_id}",
+    response_model=PolicySystemConnection,
+)
+async def update_policy_connection(
+    policy_id: int,
+    connection_id: int,
+    payload: PolicyConnectionUpdateRequest,
+    service: PolicyAnalysisService = Depends(get_policy_analysis_service),
+) -> PolicySystemConnection:
+    return await service.update_policy_connection(
+        policy_id, connection_id, payload.model_dump(exclude_none=True)
+    )
+
+
+@router.patch(
+    "/policy/{policy_id}/feedback-loops/{feedback_loop_id}",
+    response_model=PolicyFeedbackLoop,
+)
+async def update_policy_feedback_loop(
+    policy_id: int,
+    feedback_loop_id: int,
+    payload: PolicyFeedbackLoopUpdateRequest,
+    service: PolicyAnalysisService = Depends(get_policy_analysis_service),
+) -> PolicyFeedbackLoop:
+    return await service.update_policy_feedback_loop(
+        policy_id, feedback_loop_id, payload.model_dump(exclude_none=True)
+    )
+
+
+@router.patch("/policy/{policy_id}/boundary", response_model=PolicySystemBoundary)
+async def update_policy_boundary(
+    policy_id: int,
+    payload: PolicyBoundaryUpdateRequest,
+    service: PolicyAnalysisService = Depends(get_policy_analysis_service),
+) -> PolicySystemBoundary:
+    return await service.update_policy_boundary(
+        policy_id, payload.model_dump(exclude_none=True)
+    )
 
 
 @router.delete("/policy/{policy_id}", response_model=PolicyDeleteResponse)

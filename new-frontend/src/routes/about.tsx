@@ -8,7 +8,7 @@ export const Route = createFileRoute("/about")({
       {
         name: "description",
         content:
-          "How PolicyGraph HK turns system-thinking — stakeholders, feedback loops, system boundaries, and intervention points — into decision intelligence for government.",
+          "How PolicyGraph HK turns system-thinking — stakeholders, feedback loops, and intervention points — into decision intelligence for government.",
       },
       { property: "og:title", content: "Method — PolicyGraph HK" },
       {
@@ -46,7 +46,7 @@ function AboutPage() {
 
         <Section title="The frame">
           PolicyGraph HK uses the Innolabs system-thinking framework — system maps, reinforcing
-          and balancing feedback loops, system boundaries, and intervention points — to turn
+          and balancing feedback loops, and intervention points — to turn
           public data into structured decision intelligence.
         </Section>
 
