@@ -1,5 +1,8 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
+import { useMutation, useQuery } from "@tanstack/react-query";
+import { useServerFn } from "@tanstack/react-start";
 import {
+  AlertCircle,
   CircleUser,
   FileText,
   FolderKanban,
@@ -9,6 +12,12 @@ import {
   Settings,
 } from "lucide-react";
 import { WizardShell } from "@/components/policygraph/wizard/wizard-shell";
+import { WizardProvider, useWizard } from "@/components/policygraph/wizard/wizard-context";
+import {
+  listPolicyHistory,
+  loadSavedPolicyAnalysis,
+  type PolicySummary,
+} from "@/lib/policygraph/analyze.functions";
 import {
   Sidebar as SidebarFrame,
   SidebarInset,
@@ -36,25 +45,6 @@ export const Route = createFileRoute("/")({
   component: AppShell,
 });
 
-const analysisHistory = [
-  {
-    id: "hsg-2026-0418",
-    label: "Stronger rent control in high-density districts",
-    date: "2 hours ago",
-  },
-  { id: "hsg-2026-0402", label: "Vacancy tax on idle residential units", date: "Yesterday" },
-  {
-    id: "hsg-2026-0391",
-    label: "Faster approvals for public housing projects",
-    date: "3 days ago",
-  },
-  {
-    id: "hsg-2026-0377",
-    label: "Targeted rent subsidies for low-income households",
-    date: "1 week ago",
-  },
-];
-
 const primaryNav = [
   { label: "Workspace", to: "/", icon: LayoutDashboard, exact: true },
   { label: "Method", to: "/about", icon: FileText },
@@ -63,25 +53,48 @@ const primaryNav = [
 
 function AppShell() {
   return (
-    <SidebarProvider defaultOpen>
-      <SidebarFrame collapsible="icon" className="border-r nav-divider bg-transparent">
-        <WorkspaceSidebar />
-        <SidebarRail />
-      </SidebarFrame>
-      <SidebarInset className="min-w-0 bg-transparent text-foreground">
-        <TopBar />
-        <main className="flex-1 px-5 py-5 md:px-7 md:py-6">
-          <div className="panel-elevated min-h-[calc(100vh-5rem)] rounded-[30px] border hairline">
-            <WizardShell />
-          </div>
-          <div className="h-10" />
-        </main>
-      </SidebarInset>
-    </SidebarProvider>
+    <WizardProvider>
+      <SidebarProvider defaultOpen>
+        <SidebarFrame collapsible="icon" className="border-r nav-divider bg-transparent">
+          <WorkspaceSidebar />
+          <SidebarRail />
+        </SidebarFrame>
+        <SidebarInset className="min-w-0 bg-transparent text-foreground">
+          <TopBar />
+          <main className="flex-1 px-5 py-5 md:px-7 md:py-6">
+            <div className="panel-elevated min-h-[calc(100vh-5rem)] rounded-[30px] border hairline">
+              <WizardShell />
+            </div>
+            <div className="h-10" />
+          </main>
+        </SidebarInset>
+      </SidebarProvider>
+    </WizardProvider>
   );
 }
 
 function WorkspaceSidebar() {
+  const wizard = useWizard();
+  const listHistoryFn = useServerFn(listPolicyHistory);
+  const loadSavedPolicyFn = useServerFn(loadSavedPolicyAnalysis);
+  const history = useQuery({
+    queryKey: ["policy-history"],
+    queryFn: () => listHistoryFn(),
+    staleTime: 15_000,
+  });
+  const loadPolicy = useMutation({
+    mutationFn: (policyId: number) => loadSavedPolicyFn({ data: { policyId } }),
+    onSuccess: (analysis) => {
+      wizard.setQuery(analysis.policy.label);
+      wizard.setDraftText("");
+      wizard.setAnalysis(analysis);
+      wizard.setBundleAnalysis(null);
+      wizard.setSelectedDatasets(analysis.datasets ?? []);
+      wizard.setCustomStakeholders([]);
+      wizard.setStep(3);
+    },
+  });
+
   return (
     <div className="nav-rail flex h-full flex-col overflow-hidden">
       <div className="border-b nav-divider px-5 pb-5 pt-6 group-data-[collapsible=icon]:px-2">
@@ -125,26 +138,29 @@ function WorkspaceSidebar() {
         </div>
 
         <div className="mb-8 group-data-[collapsible=icon]:hidden">
-          <div className="px-3 pb-3 font-mono text-[10px] uppercase tracking-[0.28em] text-slate-300/58">
-            Analysis history
+          <div className="flex items-center justify-between px-3 pb-3">
+            <div className="font-mono text-[10px] uppercase tracking-[0.28em] text-slate-300/58">
+              Saved analyses
+            </div>
+            {history.data && (
+              <span className="rounded-full border border-white/8 bg-white/5 px-2 py-0.5 font-mono text-[9px] uppercase tracking-[0.18em] text-slate-300/62">
+                {history.data.length}
+              </span>
+            )}
           </div>
-          <ul className="space-y-2">
-            {analysisHistory.map((item) => (
-              <li key={item.id}>
-                <button className="group flex w-full min-w-0 items-start gap-3 rounded-xl border border-white/6 bg-white/[0.03] px-4 py-3 text-left transition hover:border-white/10 hover:bg-white/[0.055]">
-                  <History className="mt-0.5 h-[16px] w-[16px] shrink-0 stroke-[1.8] text-slate-400/80 transition group-hover:text-slate-200" />
-                  <div className="min-w-0">
-                    <span className="block truncate text-sm font-medium leading-5 text-slate-100/88">
-                      {item.label}
-                    </span>
-                    <span className="mt-1 block font-mono text-[10px] uppercase tracking-[0.22em] text-slate-400/68">
-                      {item.date}
-                    </span>
-                  </div>
-                </button>
-              </li>
-            ))}
-          </ul>
+          <PolicyHistoryList
+            policies={history.data ?? []}
+            isLoading={history.isPending}
+            error={history.error}
+            loadingPolicyId={loadPolicy.variables ?? null}
+            onSelectPolicy={(policyId) => loadPolicy.mutate(policyId)}
+          />
+          {loadPolicy.error && (
+            <div className="mt-3 flex items-start gap-2 rounded-xl border border-red-300/25 bg-red-500/10 px-3 py-2 text-xs leading-5 text-red-100/88">
+              <AlertCircle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+              Could not load that saved analysis.
+            </div>
+          )}
         </div>
 
         <div className="group-data-[collapsible=icon]:hidden">
@@ -175,6 +191,86 @@ function WorkspaceSidebar() {
       </div>
     </div>
   );
+}
+
+function PolicyHistoryList({
+  policies,
+  isLoading,
+  error,
+  loadingPolicyId,
+  onSelectPolicy,
+}: {
+  policies: PolicySummary[];
+  isLoading: boolean;
+  error: unknown;
+  loadingPolicyId: number | null;
+  onSelectPolicy: (policyId: number) => void;
+}) {
+  if (isLoading) {
+    return (
+      <div className="space-y-2">
+        {[0, 1, 2].map((index) => (
+          <div
+            key={index}
+            className="h-[74px] animate-pulse rounded-xl border border-white/6 bg-white/[0.035]"
+          />
+        ))}
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="rounded-xl border border-red-300/20 bg-red-500/10 px-4 py-3 text-xs leading-5 text-red-100/88">
+        Saved analysis history is unavailable. Check that the backend is running.
+      </div>
+    );
+  }
+
+  if (policies.length === 0) {
+    return (
+      <div className="rounded-xl border border-white/6 bg-white/[0.03] px-4 py-4 text-xs leading-5 text-slate-300/72">
+        No saved backend analyses yet. Run a policy analysis and it will appear here.
+      </div>
+    );
+  }
+
+  return (
+    <ul className="max-h-[42vh] space-y-2 overflow-y-auto pr-1">
+      {policies.map((policy) => (
+        <li key={policy.policy_id}>
+          <button
+            type="button"
+            onClick={() => onSelectPolicy(policy.policy_id)}
+            disabled={loadingPolicyId === policy.policy_id}
+            className="group flex w-full min-w-0 items-start gap-3 rounded-xl border border-white/6 bg-white/[0.03] px-4 py-3 text-left transition hover:border-white/10 hover:bg-white/[0.055] disabled:opacity-65"
+          >
+            <History className="mt-0.5 h-[16px] w-[16px] shrink-0 stroke-[1.8] text-slate-400/80 transition group-hover:text-slate-200" />
+            <div className="min-w-0 flex-1">
+              <span className="block truncate text-sm font-medium leading-5 text-slate-100/88">
+                {policy.text_preview}
+              </span>
+              <span className="mt-1 block font-mono text-[10px] uppercase tracking-[0.2em] text-slate-400/68">
+                {formatHistoryDate(policy.created_at)} · {policy.node_count} nodes ·{" "}
+                {policy.feedback_loop_count} loops
+              </span>
+            </div>
+          </button>
+        </li>
+      ))}
+    </ul>
+  );
+}
+
+function formatHistoryDate(value: string) {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return value;
+  return new Intl.DateTimeFormat("en-HK", {
+    month: "short",
+    day: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  }).format(date);
 }
 
 function TopBar() {

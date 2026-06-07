@@ -64,6 +64,17 @@ async def create_frontend_policy_analysis(
     return await service.analyze_policy_for_frontend(payload)
 
 
+@router.get(
+    "/api/frontend/policygraph/policies/{policy_id}",
+    response_model=FrontendPolicyAnalysisResponse,
+)
+async def get_frontend_policy_analysis(
+    policy_id: int,
+    service: PolicyAnalysisService = Depends(get_policy_analysis_service),
+) -> FrontendPolicyAnalysisResponse:
+    return await service.get_policy_for_frontend(policy_id)
+
+
 @router.post(
     "/api/frontend/policygraph/datasets/search",
     response_model=FrontendDatasetSearchResponse,

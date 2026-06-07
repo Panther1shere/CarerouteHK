@@ -28,12 +28,8 @@ export function DatasetPicker() {
 
   return (
     <div className="space-y-4">
-      <div>
-        <h3 className="font-display text-2xl font-semibold">Data sources from data.gov.hk</h3>
-        <p className="text-sm text-muted-foreground">
-          The model suggested these datasets. Curate them — uncheck any that don't fit, or search
-          and add more. Step 3 will pull live records from your selection.
-        </p>
+      <div className="font-mono text-[10px] uppercase tracking-[0.22em] text-muted-foreground">
+        Data
       </div>
 
       <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
@@ -104,7 +100,7 @@ export function DatasetPicker() {
 
       <div className="rounded-xl border border-dashed hairline bg-surface/30 p-4">
         <div className="font-mono text-[10px] uppercase tracking-wider text-muted-foreground">
-          Search data.gov.hk for more datasets
+          Search
         </div>
         <form
           onSubmit={(e) => {

@@ -71,16 +71,19 @@ export function ImpactChart({ impact, compareImpact }: Props) {
       <div className="flex flex-wrap items-center gap-4 pt-2 text-[11px] text-muted-foreground">
         <span className="flex items-center gap-1.5">
           <span className="h-2.5 w-2.5 rounded-sm" style={{ background: "var(--color-jade)" }} />
-          Beneficial direction
+          Beneficial
         </span>
         <span className="flex items-center gap-1.5">
           <span className="h-2.5 w-2.5 rounded-sm" style={{ background: "var(--color-coral)" }} />
-          Counter-productive direction
+          Counterproductive
         </span>
         {compareImpact && (
           <span className="flex items-center gap-1.5">
-            <span className="h-2.5 w-3 border border-dashed" style={{ borderColor: "var(--color-muted-foreground)" }} />
-            Baseline (before bundle)
+            <span
+              className="h-2.5 w-3 border border-dashed"
+              style={{ borderColor: "var(--color-muted-foreground)" }}
+            />
+            Baseline
           </span>
         )}
       </div>

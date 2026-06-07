@@ -22,10 +22,10 @@ export function Step4Bundle() {
   const [openIdx, setOpenIdx] = useState<number | null>(null);
   const run = useMutation({
     mutationFn: () => {
-      const bundleNames = (a?.bundle ?? []).map((b) => b.label).join(", ");
+      const interventionNames = (a?.bundle ?? []).map((b) => b.label).join(", ");
       return fn({
         data: {
-          query: `${w.query} — stacked with: ${bundleNames}`,
+          query: `${w.query} — with interventions: ${interventionNames}`,
           horizon: w.horizon,
           draftText: w.draftText || undefined,
           selectedDatasets: w.selectedDatasets,
@@ -43,17 +43,14 @@ export function Step4Bundle() {
   return (
     <div className="mx-auto max-w-6xl space-y-8">
       <div>
-        <div className="font-mono text-[10px] uppercase tracking-[0.25em] text-primary">
-          Step 4 — Suggested policy bundle
+        <div className="font-mono text-[11px] uppercase tracking-[0.26em] text-primary">
+          Intervention
         </div>
-        <h2 className="mt-2 font-display text-4xl font-semibold">Highest-leverage interventions</h2>
-        <p className="mt-2 max-w-2xl text-sm text-muted-foreground">{a.bundleRationale}</p>
       </div>
 
       <div className="grid gap-4 xl:grid-cols-2">
         {a.bundle.map((b, i) => {
           const isOpen = openIdx === i;
-          const body = b.description || b.rationale;
           const mapping = buildBundleMapping(a, b);
           return (
             <div
@@ -68,7 +65,7 @@ export function Step4Bundle() {
                 <div>
                   <div className="flex flex-wrap items-center gap-2">
                     <span className="font-mono text-[10px] uppercase tracking-wider text-muted-foreground">
-                      Intervention {b.rank ?? i + 1}
+                      {b.rank ?? i + 1}
                     </span>
                     {typeof b.confidence === "number" && (
                       <span className="rounded-full bg-primary/8 px-2 py-0.5 font-mono text-[10px] uppercase tracking-wider text-primary">
@@ -92,42 +89,37 @@ export function Step4Bundle() {
               </button>
               {isOpen && (
                 <div className="space-y-5 border-t hairline px-5 py-5">
-                  {body && <p className="text-sm leading-6 text-muted-foreground">{body}</p>}
-                  {b.description && b.rationale && b.rationale !== b.description && (
-                    <p className="text-sm leading-6 text-muted-foreground">{b.rationale}</p>
-                  )}
-
                   <div className="grid gap-3 md:grid-cols-2">
                     <MappingBlock
                       icon={Target}
-                      label="Exact intervention points"
+                      label="Points"
                       values={mapping.interventionPoints}
-                      empty="No explicit intervention point returned"
+                      empty="None"
                     />
                     <MappingBlock
                       icon={Network}
-                      label="Targeted system nodes"
+                      label="Nodes"
                       values={mapping.nodeLabels}
-                      empty="No exact node targets returned"
+                      empty="None"
                     />
                     <MappingBlock
                       icon={GitBranch}
-                      label="Feedback loops"
+                      label="Loops"
                       values={mapping.loopLabels}
-                      empty="No loop target returned"
+                      empty="None"
                     />
                     <MappingBlock
                       icon={Users}
-                      label="Affected stakeholders"
+                      label="Stakeholders"
                       values={mapping.stakeholderLabels}
-                      empty="No stakeholder focus returned"
+                      empty="None"
                     />
                   </div>
 
                   {mapping.ripple.length > 0 && (
                     <div className="rounded-2xl border hairline bg-surface/60 p-4">
                       <div className="font-mono text-[10px] uppercase tracking-[0.22em] text-primary">
-                        Cause-and-effect ripple
+                        Ripple
                       </div>
                       <div className="mt-3 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
                         {mapping.ripple.map((step, index) => (
@@ -144,27 +136,21 @@ export function Step4Bundle() {
                     </div>
                   )}
 
-                  {b.expectedSystemShift && (
-                    <div className="rounded-2xl border border-primary/18 bg-primary/6 p-4 text-sm leading-6 text-primary">
-                      {b.expectedSystemShift}
-                    </div>
-                  )}
-
                   {(b.implementationNotes?.length ?? 0) > 0 && (
                     <MappingBlock
                       icon={ArrowRight}
-                      label="Implementation notes"
+                      label="Notes"
                       values={b.implementationNotes ?? []}
-                      empty="No implementation notes returned"
+                      empty="None"
                     />
                   )}
 
                   {(b.tradeoffs?.length ?? 0) > 0 && (
                     <MappingBlock
                       icon={AlertCircle}
-                      label="Tradeoffs to monitor"
+                      label="Tradeoffs"
                       values={b.tradeoffs ?? []}
-                      empty="No tradeoffs returned"
+                      empty="None"
                     />
                   )}
                 </div>
@@ -194,11 +180,11 @@ export function Step4Bundle() {
         >
           {run.isPending ? (
             <>
-              <Loader2 className="h-4 w-4 animate-spin" /> Simulating bundle…
+              <Loader2 className="h-4 w-4 animate-spin" /> Simulating…
             </>
           ) : (
             <>
-              Simulate bundle & compare <ArrowRight className="h-4 w-4" />
+              Simulate intervention <ArrowRight className="h-4 w-4" />
             </>
           )}
         </button>

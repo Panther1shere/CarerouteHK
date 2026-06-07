@@ -9,9 +9,9 @@ import { DatasetPicker } from "./dataset-picker";
 
 const LEVELS: Stakeholder["level"][] = ["micro", "meso", "macro"];
 const LEVEL_TITLE: Record<Stakeholder["level"], string> = {
-  micro: "Micro — actors & organisations",
-  meso: "Meso — environment & resources",
-  macro: "Macro — system forces",
+  micro: "Micro",
+  meso: "Meso",
+  macro: "Macro",
 };
 
 export function Step2Stakeholders() {
@@ -51,12 +51,12 @@ export function Step2Stakeholders() {
   if (!a) {
     return (
       <div className="mx-auto max-w-2xl rounded-2xl border border-dashed hairline bg-surface/40 p-10 text-center">
-        <p className="text-muted-foreground">No analysis yet. Start at Step 1.</p>
+        <p className="text-muted-foreground">No analysis yet.</p>
         <button
           onClick={() => w.setStep(1)}
           className="mt-4 inline-flex items-center gap-2 rounded-xl bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground"
         >
-          <ArrowLeft className="h-4 w-4" /> Back to Step 1
+          <ArrowLeft className="h-4 w-4" /> Back
         </button>
       </div>
     );
@@ -78,12 +78,13 @@ export function Step2Stakeholders() {
     const cur = w.analysis;
     if (!cur) return;
     const label = newSt.label.trim();
-    const short = label
-      .split(/\s+/)
-      .map((p) => p[0])
-      .join("")
-      .slice(0, 3)
-      .toUpperCase() || "NEW";
+    const short =
+      label
+        .split(/\s+/)
+        .map((p) => p[0])
+        .join("")
+        .slice(0, 3)
+        .toUpperCase() || "NEW";
     const newStake: Stakeholder = {
       id: `custom-${Date.now()}`,
       label,
@@ -93,7 +94,11 @@ export function Step2Stakeholders() {
       note: newSt.note || "Custom stakeholder added for this analysis.",
       impact: 0,
       analysis: [
-        { key: "micro", label: "Micro", value: newSt.note || "Custom stakeholder — not yet analysed in depth." },
+        {
+          key: "micro",
+          label: "Micro",
+          value: newSt.note || "Custom stakeholder — not yet analysed in depth.",
+        },
         { key: "meso", label: "Meso", value: "—" },
         { key: "macro", label: "Macro", value: "—" },
       ],
@@ -106,26 +111,13 @@ export function Step2Stakeholders() {
   return (
     <div className="mx-auto max-w-6xl space-y-10">
       <div>
-        <div className="font-mono text-[10px] uppercase tracking-[0.25em] text-primary">
-          Step 2 — Stakeholders & data sources
-        </div>
-        <h2 className="mt-2 font-display text-4xl font-semibold">{a.policy.label}</h2>
-        <p className="mt-2 max-w-3xl text-sm text-muted-foreground">{a.policy.summary}</p>
-        <div className="mt-2 font-mono text-[11px] uppercase tracking-wider text-primary">
-          {a.interpretation}
+        <div className="font-mono text-[11px] uppercase tracking-[0.26em] text-primary">
+          Stakeholders
         </div>
       </div>
 
-      {/* Stakeholders */}
       <section className="space-y-6">
         <div className="flex flex-wrap items-end justify-between gap-3">
-          <div>
-            <h3 className="font-display text-2xl font-semibold">Stakeholders</h3>
-            <p className="text-sm text-muted-foreground">
-              Click any card to expand the full Micro / Meso / Macro analysis. Remove what
-              doesn't apply, or add stakeholders the model missed.
-            </p>
-          </div>
           <button
             onClick={() => setAdding((s) => !s)}
             className="inline-flex items-center gap-1.5 rounded-full border hairline bg-surface/40 px-3 py-1.5 text-xs hover:border-primary/60"
@@ -145,7 +137,9 @@ export function Step2Stakeholders() {
               />
               <select
                 value={newSt.level}
-                onChange={(e) => setNewSt({ ...newSt, level: e.target.value as Stakeholder["level"] })}
+                onChange={(e) =>
+                  setNewSt({ ...newSt, level: e.target.value as Stakeholder["level"] })
+                }
                 className="rounded-lg border hairline bg-background/60 px-3 py-2 text-sm"
               >
                 <option value="micro">Micro level</option>
@@ -161,7 +155,10 @@ export function Step2Stakeholders() {
               className="mt-2 w-full rounded-lg border hairline bg-background/60 px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-primary/40"
             />
             <div className="mt-3 flex justify-end gap-2">
-              <button onClick={() => setAdding(false)} className="rounded-lg px-3 py-1.5 text-xs text-muted-foreground hover:text-foreground">
+              <button
+                onClick={() => setAdding(false)}
+                className="rounded-lg px-3 py-1.5 text-xs text-muted-foreground hover:text-foreground"
+              >
                 Cancel
               </button>
               <button
@@ -173,8 +170,6 @@ export function Step2Stakeholders() {
             </div>
           </div>
         )}
-
-
 
         {grouped.map(({ lvl, items }) =>
           items.length === 0 ? null : (
@@ -192,11 +187,10 @@ export function Step2Stakeholders() {
                 ))}
               </div>
             </div>
-          )
+          ),
         )}
       </section>
 
-      {/* Datasets */}
       <section className="border-t hairline pt-10">
         <DatasetPicker />
       </section>
@@ -221,11 +215,17 @@ export function Step2Stakeholders() {
           className="inline-flex items-center gap-2 rounded-xl bg-primary px-5 py-2.5 text-sm font-semibold text-primary-foreground hover:opacity-90 disabled:opacity-60"
         >
           {rerun.isPending ? (
-            <><Loader2 className="h-4 w-4 animate-spin" /> Re-grounding with your selections…</>
+            <>
+              <Loader2 className="h-4 w-4 animate-spin" /> Re-grounding with your selections…
+            </>
           ) : w.selectedDatasets.length !== a.datasets.length ? (
-            <><Sparkles className="h-4 w-4" /> Re-analyse & continue</>
+            <>
+              <Sparkles className="h-4 w-4" /> Re-analyse & continue
+            </>
           ) : (
-            <>Continue to system map <ArrowRight className="h-4 w-4" /></>
+            <>
+              System <ArrowRight className="h-4 w-4" />
+            </>
           )}
         </button>
       </div>

@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { WizardProvider, useWizard } from "./wizard-context";
+import { useWizard } from "./wizard-context";
 import { Step1PolicyInput } from "./step1-policy-input";
 import { Step2Stakeholders } from "./step2-stakeholders";
 import { Step3SystemMap } from "./step3-system-map";
@@ -11,8 +11,8 @@ import { Check } from "lucide-react";
 const STEPS = [
   { n: 1, label: "Policy" },
   { n: 2, label: "Stakeholders" },
-  { n: 3, label: "System map" },
-  { n: 4, label: "Bundle" },
+  { n: 3, label: "System" },
+  { n: 4, label: "Intervention" },
   { n: 5, label: "Comparison" },
 ];
 
@@ -29,14 +29,7 @@ function StepIndicator() {
 
   return (
     <div className="sticky top-[92px] z-20 border-b hairline bg-white/86 backdrop-blur-xl transition-all md:top-[104px]">
-      <div className={`mx-auto max-w-7xl px-7 transition-all ${compact ? "py-2.5" : "py-5"}`}>
-        <div
-          className={`overflow-hidden font-mono text-[10px] uppercase tracking-[0.24em] text-primary/78 transition-all ${
-            compact ? "mb-0 max-h-0 opacity-0" : "mb-3 max-h-5 opacity-100"
-          }`}
-        >
-          Housing policy workflow
-        </div>
+      <div className={`mx-auto max-w-7xl px-7 transition-all ${compact ? "py-2.5" : "py-3"}`}>
         <div className="flex items-center gap-2 overflow-x-auto">
           {STEPS.map((s, i) => {
             const done = w.step > s.n;
@@ -52,7 +45,7 @@ function StepIndicator() {
                 <button
                   onClick={() => reachable && w.setStep(s.n)}
                   disabled={!reachable}
-                  aria-label={`Step ${s.n}: ${s.label}`}
+                  aria-label={`${s.n}. ${s.label}`}
                   title={s.label}
                   className={`flex items-center gap-2 rounded-full border text-xs font-medium uppercase tracking-[0.12em] transition ${
                     active
@@ -106,10 +99,10 @@ function StepContent() {
 
 export function WizardShell() {
   return (
-    <WizardProvider>
+    <>
       <StepIndicator />
       <StepContent />
       <Chatbot />
-    </WizardProvider>
+    </>
   );
 }

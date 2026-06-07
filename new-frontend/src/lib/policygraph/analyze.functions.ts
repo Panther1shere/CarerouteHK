@@ -129,6 +129,19 @@ export interface PolicyGraphPayload {
   notes: GraphNote[];
 }
 
+export interface PolicySummary {
+  policy_id: number;
+  text_preview: string;
+  policy_domain: string;
+  llm_model: string;
+  created_at: string;
+  stakeholder_count: number;
+  node_count: number;
+  connection_count: number;
+  feedback_loop_count: number;
+  note_count: number;
+}
+
 export interface PolicyAnalysis {
   policyId?: number;
   interpretation: string;
@@ -249,6 +262,16 @@ export const analyzePolicy = createServerFn({ method: "POST" })
         selected_datasets: data.selectedDatasets ?? [],
       }),
     });
+  });
+
+export const listPolicyHistory = createServerFn({ method: "GET" }).handler(async () => {
+  return requestBackend<PolicySummary[]>("/policy");
+});
+
+export const loadSavedPolicyAnalysis = createServerFn({ method: "GET" })
+  .validator(z.object({ policyId: z.number().int().positive() }))
+  .handler(async ({ data }) => {
+    return requestBackend<PolicyAnalysis>(`/api/frontend/policygraph/policies/${data.policyId}`);
   });
 
 export const parseDraft = createServerFn({ method: "POST" })

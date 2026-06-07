@@ -101,7 +101,14 @@ export function FeedbackLoopCard({ loop, index }: { loop: FeedbackLoop; index: n
           })}
 
           {/* Center R/B sigil */}
-          <circle cx={cx} cy={cy} r="34" fill="var(--color-ink, #0b0b0c)" stroke={accent} strokeOpacity="0.4" />
+          <circle
+            cx={cx}
+            cy={cy}
+            r="34"
+            fill="var(--color-ink, #0b0b0c)"
+            stroke={accent}
+            strokeOpacity="0.4"
+          />
           <text
             x={cx}
             y={cy + 2}
@@ -126,7 +133,6 @@ export function FeedbackLoopCard({ loop, index }: { loop: FeedbackLoop; index: n
           >
             {isReinforcing ? "reinforce" : "balance"}
           </text>
-
 
           {/* Node chips */}
           {positions.map((p, i) => {
@@ -179,14 +185,13 @@ export function FeedbackLoopCard({ loop, index }: { loop: FeedbackLoop; index: n
                 >
                   {effect}
                 </text>
-
               </motion.g>
             );
           })}
         </svg>
       </div>
 
-      <p className="mt-4 text-sm text-muted-foreground">{loop.summary}</p>
+      {loop.summary && <p className="mt-4 text-sm text-muted-foreground">{loop.summary}</p>}
     </motion.div>
   );
 }
@@ -195,4 +200,3 @@ function capitalize(s: string) {
   if (!s) return s;
   return s.charAt(0).toUpperCase() + s.slice(1);
 }
-

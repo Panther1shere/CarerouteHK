@@ -174,17 +174,9 @@ export function Step3SystemMap() {
     <div className="mx-auto max-w-[1440px] space-y-8">
       <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
         <div>
-          <div className="font-mono text-[10px] uppercase tracking-[0.25em] text-primary">
-            Step 3 — Relationship map
+          <div className="font-mono text-[11px] uppercase tracking-[0.26em] text-primary">
+            Complete picture
           </div>
-          <h2 className="mt-2 font-display text-4xl font-semibold tracking-tight">
-            Visualise the relationships before deciding what to change
-          </h2>
-          <p className="mt-3 max-w-4xl text-sm leading-6 text-muted-foreground">
-            The map should show which pressures, actors, and outcomes are influencing each other.
-            Select a node or a loop to inspect the reasoning, add iteration notes, and refine the
-            story until the policy logic is legible.
-          </p>
           {graph.interventionPoints.length > 0 && (
             <div className="mt-4 flex max-w-4xl flex-wrap gap-2">
               {graph.interventionPoints.slice(0, 5).map((point) => (
@@ -192,7 +184,7 @@ export function Step3SystemMap() {
                   key={point}
                   className="rounded-full border border-primary/18 bg-primary/6 px-3 py-1.5 text-[11px] font-medium text-primary"
                 >
-                  Intervention point: {point}
+                  {point}
                 </span>
               ))}
             </div>
@@ -215,17 +207,7 @@ export function Step3SystemMap() {
       </div>
 
       <section className="relative overflow-hidden rounded-[32px] border hairline bg-white shadow-[0_28px_70px_rgba(15,23,42,0.08)]">
-        <div className="flex items-center justify-between border-b hairline px-6 py-4">
-          <div>
-            <div className="font-mono text-[10px] uppercase tracking-[0.22em] text-primary">
-              Interactive graph
-            </div>
-            <div className="mt-1 text-sm text-muted-foreground">
-              Click a node to inspect it. Select a loop to isolate a cycle. Green arrows show
-              reinforcing influence and red arrows show reducing influence.
-            </div>
-          </div>
-
+        <div className="flex items-center justify-end border-b hairline px-6 py-4">
           <div className="hidden items-center gap-2 lg:flex">
             {graph.feedbackLoops.slice(0, 4).map((loop, index) => {
               const active = selectedLoopId === loop.feedback_loop_id;
@@ -292,17 +274,8 @@ export function Step3SystemMap() {
 
       {graph.feedbackLoops.length > 0 || fallbackLoops.length > 0 ? (
         <section className="space-y-5">
-          <div className="max-w-3xl">
-            <div className="font-mono text-[10px] uppercase tracking-[0.22em] text-primary">
-              Feedback loops
-            </div>
-            <h3 className="mt-2 text-2xl font-semibold tracking-tight text-foreground">
-              What is feeding back into itself
-            </h3>
-            <p className="mt-2 text-sm leading-6 text-muted-foreground">
-              These loop views explain the cycles that keep reinforcing or balancing the policy
-              environment. Use them to see where one change starts triggering another.
-            </p>
+          <div className="font-mono text-[10px] uppercase tracking-[0.22em] text-primary">
+            Loops
           </div>
 
           <div className="grid gap-5 xl:grid-cols-2">
@@ -329,7 +302,7 @@ export function Step3SystemMap() {
                                 edge.source_node_id === nodeId || edge.target_node_id === nodeId,
                             )?.relationship_type ?? "influences",
                         })),
-                        summary: loop.explanation,
+                        summary: "",
                       }}
                       index={index}
                     />
@@ -355,7 +328,7 @@ export function Step3SystemMap() {
           onClick={() => w.setStep(4)}
           className="inline-flex items-center gap-2 rounded-xl bg-primary px-5 py-2.5 text-sm font-semibold text-primary-foreground hover:opacity-90"
         >
-          Suggested policy bundle <ArrowRight className="h-4 w-4" />
+          Intervention <ArrowRight className="h-4 w-4" />
         </button>
       </div>
 

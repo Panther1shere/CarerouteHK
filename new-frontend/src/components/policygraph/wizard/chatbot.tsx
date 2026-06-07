@@ -6,8 +6,14 @@ import { useWizard } from "./wizard-context";
 import { chatWithContext } from "@/lib/policygraph/analyze.functions";
 
 export function Chatbot() {
+<<<<<<< HEAD
   const { step, query, horizon, analysis, selectedDatasets, chatMessages, setChatMessages } = useWizard();
   const [open, setOpen] = useState(false);
+=======
+  const { step, query, horizon, analysis, selectedDatasets, chatMessages, setChatMessages } =
+    useWizard();
+  const [open, setOpen] = useState(true);
+>>>>>>> 7a19f56 (added the small thing)
   const [input, setInput] = useState("");
   const scrollRef = useRef<HTMLDivElement>(null);
   const fn = useServerFn(chatWithContext);
@@ -21,14 +27,22 @@ export function Chatbot() {
             interpretation: analysis.interpretation,
             policy: analysis.policy,
             stakeholders: analysis.stakeholders.map((s) => ({
-              label: s.label, level: s.level, group: s.group, impact: s.impact, note: s.note,
+              label: s.label,
+              level: s.level,
+              group: s.group,
+              impact: s.impact,
+              note: s.note,
             })),
-            loops: analysis.loops.map((l) => ({ title: l.title, type: l.type, summary: l.summary })),
+            loops: analysis.loops.map((l) => ({
+              title: l.title,
+              type: l.type,
+              summary: l.summary,
+            })),
             warnings: analysis.warnings,
             bundle: analysis.bundle,
           })
         : undefined;
-      const datasets = (selectedDatasets.length ? selectedDatasets : analysis?.datasets ?? [])
+      const datasets = (selectedDatasets.length ? selectedDatasets : (analysis?.datasets ?? []))
         .slice(0, 12)
         .map((d) => ({ title: d.title, url: d.url }));
       const res = await fn({
@@ -73,11 +87,14 @@ export function Chatbot() {
           <div>
             <div className="text-sm font-semibold tracking-tight">Policy assistant</div>
             <div className="font-mono text-[9px] uppercase tracking-[0.22em] text-muted-foreground">
-              Step {step} · grounded in your datasets
+              Context
             </div>
           </div>
         </div>
-        <button onClick={() => setOpen(false)} className="rounded-full border hairline p-2 text-muted-foreground transition hover:text-foreground">
+        <button
+          onClick={() => setOpen(false)}
+          className="rounded-full border hairline p-2 text-muted-foreground transition hover:text-foreground"
+        >
           <X className="h-4 w-4" />
         </button>
       </header>
@@ -117,7 +134,10 @@ export function Chatbot() {
       </div>
 
       <form
-        onSubmit={(e) => { e.preventDefault(); submit(); }}
+        onSubmit={(e) => {
+          e.preventDefault();
+          submit();
+        }}
         className="flex items-center gap-2 border-t hairline p-4"
       >
         <input

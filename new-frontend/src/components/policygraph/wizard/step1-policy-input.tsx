@@ -1,5 +1,5 @@
 import { useRef, useState } from "react";
-import { useMutation } from "@tanstack/react-query";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { Upload, FileText, Loader2, Play, X, AlertCircle } from "lucide-react";
 import { useWizard } from "./wizard-context";
@@ -7,6 +7,7 @@ import { analyzePolicy, parseDraft } from "@/lib/policygraph/analyze.functions";
 
 export function Step1PolicyInput() {
   const w = useWizard();
+  const queryClient = useQueryClient();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [draftFile, setDraftFile] = useState<string | null>(null);
 
@@ -20,14 +21,19 @@ export function Step1PolicyInput() {
       const bytes = new Uint8Array(buf);
       for (let i = 0; i < bytes.length; i++) binary += String.fromCharCode(bytes[i]);
       const b64 = btoa(binary);
-      return parseFn({ data: { filename: file.name, mimeType: file.type || "text/plain", contentBase64: b64 } });
+      return parseFn({
+        data: { filename: file.name, mimeType: file.type || "text/plain", contentBase64: b64 },
+      });
     },
     onSuccess: (res) => {
       w.setDraftText(res.text);
       setDraftFile(res.filename);
       // pre-fill query with a short summary line if empty
       if (!w.query) {
-        const firstLine = res.text.split("\n").find((l) => l.trim().length > 10)?.slice(0, 200);
+        const firstLine = res.text
+          .split("\n")
+          .find((l) => l.trim().length > 10)
+          ?.slice(0, 200);
         if (firstLine) w.setQuery(firstLine);
       }
     },
@@ -42,6 +48,7 @@ export function Step1PolicyInput() {
       w.setAnalysis(a);
       // pre-select all returned datasets by default
       w.setSelectedDatasets(a.datasets);
+      queryClient.invalidateQueries({ queryKey: ["policy-history"] });
       w.setStep(2);
     },
   });
@@ -59,16 +66,7 @@ export function Step1PolicyInput() {
   return (
     <div className="mx-auto max-w-4xl space-y-6">
       <div>
-        <div className="font-mono text-[10px] uppercase tracking-[0.25em] text-primary">
-          Step 1 — Policy input
-        </div>
-        <h2 className="mt-2 font-display text-4xl font-semibold">
-          What policy do you want to analyse?
-        </h2>
-        <p className="mt-2 max-w-2xl text-sm text-muted-foreground">
-          Describe a policy in plain language, or upload a draft document. The model will
-          plan its own dataset queries against data.gov.hk before any analysis.
-        </p>
+        <div className="font-mono text-[11px] uppercase tracking-[0.26em] text-primary">Policy</div>
       </div>
 
       <div className="rounded-2xl border hairline bg-surface/40 p-5">
@@ -107,12 +105,8 @@ export function Step1PolicyInput() {
 
       <div className="rounded-2xl border border-dashed hairline bg-surface/30 p-5">
         <label className="font-mono text-[10px] uppercase tracking-wider text-muted-foreground">
-          Optional — Upload policy draft
+          Draft upload
         </label>
-        <p className="mt-1 text-xs text-muted-foreground">
-          Supported: .txt, .md, .json (max 6 MB). PDF/DOCX coming soon — paste the text
-          for now.
-        </p>
 
         {draftFile ? (
           <div className="mt-3 flex items-center justify-between gap-3 rounded-lg border hairline bg-background/60 p-3">
@@ -126,7 +120,10 @@ export function Step1PolicyInput() {
               </div>
             </div>
             <button
-              onClick={() => { w.setDraftText(""); setDraftFile(null); }}
+              onClick={() => {
+                w.setDraftText("");
+                setDraftFile(null);
+              }}
               className="rounded p-1 text-muted-foreground hover:text-foreground"
             >
               <X className="h-4 w-4" />
@@ -139,9 +136,13 @@ export function Step1PolicyInput() {
             className="mt-3 flex w-full items-center justify-center gap-2 rounded-lg border border-dashed hairline bg-background/40 py-6 text-sm text-muted-foreground hover:border-primary hover:text-foreground disabled:opacity-60"
           >
             {parse.isPending ? (
-              <><Loader2 className="h-4 w-4 animate-spin" /> Parsing…</>
+              <>
+                <Loader2 className="h-4 w-4 animate-spin" /> Parsing…
+              </>
             ) : (
-              <><Upload className="h-4 w-4" /> Click to upload a draft document</>
+              <>
+                <Upload className="h-4 w-4" /> Upload draft
+              </>
             )}
           </button>
         )}
@@ -177,9 +178,13 @@ export function Step1PolicyInput() {
           className="inline-flex items-center gap-2 rounded-xl bg-primary px-5 py-2.5 text-sm font-semibold text-primary-foreground transition hover:opacity-90 disabled:opacity-60"
         >
           {analyze.isPending ? (
-            <><Loader2 className="h-4 w-4 animate-spin" /> Planning queries & analysing…</>
+            <>
+              <Loader2 className="h-4 w-4 animate-spin" /> Planning queries & analysing…
+            </>
           ) : (
-            <><Play className="h-4 w-4" /> Analyse policy → Step 2</>
+            <>
+              <Play className="h-4 w-4" /> Analyse policy
+            </>
           )}
         </button>
       </div>

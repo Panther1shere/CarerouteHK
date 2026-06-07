@@ -143,6 +143,22 @@ class PolicyAnalysisService:
             enhancement_analysis=enhancement_analysis,
         )
 
+    async def get_policy_for_frontend(
+        self, policy_id: int,
+    ) -> FrontendPolicyAnalysisResponse:
+        policy = await self.get_policy(policy_id)
+        intervention_analysis = await self.get_policy_intervention_analysis(policy_id)
+        enhancement_analysis = await self.get_policy_enhancement_analysis(policy_id)
+        query = self._derive_query_from_saved_policy(policy.text)
+        return self._build_frontend_analysis_response(
+            query=query,
+            horizon=None,
+            datasets=[],
+            policy=policy,
+            intervention_analysis=intervention_analysis,
+            enhancement_analysis=enhancement_analysis,
+        )
+
     async def search_frontend_datasets(
         self, query: str, rows: int
     ) -> FrontendDatasetSearchResponse:
@@ -545,6 +561,12 @@ class PolicyAnalysisService:
         if not label:
             return "Housing policy analysis"
         return label[:1].upper() + label[1:]
+
+    def _derive_query_from_saved_policy(self, policy_text: str) -> str:
+        match = re.search(r"^Policy query:\s*(.+)$", policy_text, flags=re.MULTILINE)
+        if match:
+            return self._clean_phrase(match.group(1))
+        return self._clean_phrase(policy_text)[:500]
 
     def _derive_policy_summary(
         self, query: str, policy: PolicyAnalysisResponse
