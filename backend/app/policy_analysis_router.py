@@ -3,6 +3,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config import get_settings
 from app.database import get_session
+from app.demo_data import get_demo_policygraph_payload
 from app.policy_analysis_repository import PolicyAnalysisRepository
 from app.policy_analysis_service import PolicyAnalysisService
 from app.schemas import (
@@ -43,6 +44,11 @@ def get_policy_analysis_service(
 ) -> PolicyAnalysisService:
     repository = PolicyAnalysisRepository(session)
     return PolicyAnalysisService(repository=repository, settings=get_settings())
+
+
+@router.get("/api/frontend/policygraph/demo")
+async def get_frontend_policygraph_demo() -> dict:
+    return get_demo_policygraph_payload()
 
 
 @router.post("/policy", response_model=PolicyAnalysisResponse)

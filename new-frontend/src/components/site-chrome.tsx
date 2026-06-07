@@ -19,6 +19,7 @@ export function SiteHeader() {
 
         <nav className="hidden items-center gap-2 md:flex">
           <NavLink to="/">Simulator</NavLink>
+          <NavLink to="/demo">Demo</NavLink>
           <NavLink to="/about">Method</NavLink>
           <NavLink to="/use-cases">Roadmap</NavLink>
         </nav>
@@ -45,6 +46,11 @@ export function SiteFooter() {
             <li>
               <Link to="/" className="transition hover:text-foreground">
                 Simulator
+              </Link>
+            </li>
+            <li>
+              <Link to="/demo" className="transition hover:text-foreground">
+                Demo
               </Link>
             </li>
             <li>

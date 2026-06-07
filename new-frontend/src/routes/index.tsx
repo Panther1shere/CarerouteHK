@@ -47,6 +47,7 @@ export const Route = createFileRoute("/")({
 
 const primaryNav = [
   { label: "Workspace", to: "/", icon: LayoutDashboard, exact: true },
+  { label: "Demo", to: "/demo", icon: History },
   { label: "Method", to: "/about", icon: FileText },
   { label: "Roadmap", to: "/use-cases", icon: FolderKanban },
 ];

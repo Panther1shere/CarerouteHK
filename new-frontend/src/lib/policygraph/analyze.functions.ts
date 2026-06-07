@@ -195,6 +195,63 @@ export interface PolicyAnalysis {
   graph?: PolicyGraphPayload;
 }
 
+export interface DemoPolicyGraph {
+  policy: {
+    title: string;
+    subtitle: string;
+    summary: string;
+    question: string;
+    intervention: {
+      title: string;
+      action: string;
+      why: string;
+      leverage_node: string;
+    };
+  };
+  stakeholders: Array<{
+    id: string;
+    name: string;
+    role: string;
+    tone: "government" | "market" | "people";
+    x: number;
+    y: number;
+  }>;
+  nodes: Array<{
+    id: string;
+    label: string;
+    type: string;
+    description: string;
+    x: number;
+    y: number;
+    tone: "government" | "market" | "people" | "housing" | "finance";
+  }>;
+  edges: Array<{
+    source: string;
+    target: string;
+    polarity: "+" | "-";
+    label: string;
+    explanation: string;
+  }>;
+  loops: Array<{
+    id: string;
+    label: string;
+    type: "reinforcing" | "balancing";
+    nodes: string[];
+    summary: string;
+    intervention: string;
+  }>;
+  impact: {
+    baseline: Array<{ label: string; value: number }>;
+    after: Array<{ label: string; value: number }>;
+  };
+  comparison: Array<{
+    label: string;
+    title: string;
+    effect: string;
+    score: number;
+  }>;
+}
+
 function backendBaseUrl() {
   return (process.env.BACKEND_URL ?? "http://127.0.0.1:8000").replace(/\/$/, "");
 }
@@ -266,6 +323,10 @@ export const analyzePolicy = createServerFn({ method: "POST" })
 
 export const listPolicyHistory = createServerFn({ method: "GET" }).handler(async () => {
   return requestBackend<PolicySummary[]>("/policy");
+});
+
+export const loadDemoPolicyGraph = createServerFn({ method: "GET" }).handler(async () => {
+  return requestBackend<DemoPolicyGraph>("/api/frontend/policygraph/demo");
 });
 
 export const loadSavedPolicyAnalysis = createServerFn({ method: "GET" })
