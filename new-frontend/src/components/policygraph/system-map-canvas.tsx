@@ -237,7 +237,7 @@ export function SystemMapCanvas({
           );
         })}
 
-        {edges.map((edge) => {
+        {edges.map((edge, edgeIndex) => {
           const source = nodeMap[edge.source_node_id];
           const target = nodeMap[edge.target_node_id];
           if (!source || !target) {
@@ -248,19 +248,17 @@ export function SystemMapCanvas({
           const targetBox = getNodeBox(target);
           const start = edgeAnchorPoint(sourceBox, targetBox);
           const end = edgeAnchorPoint(targetBox, sourceBox);
-          const dx = end.x - start.x;
-          const dy = end.y - start.y;
-          const length = Math.max(Math.hypot(dx, dy), 1);
-          const normal = { x: -dy / length, y: dx / length };
-          const curveOffset = Math.min(26, Math.max(12, length * 0.045));
-          const control = {
-            x: start.x + dx / 2 + normal.x * curveOffset,
-            y: start.y + dy / 2 + normal.y * curveOffset,
-          };
-          const label = {
-            x: start.x + dx / 2 + normal.x * (curveOffset + 12),
-            y: start.y + dy / 2 + normal.y * (curveOffset + 12),
-          };
+          const route = buildEdgeRoute({
+            edge,
+            edgeIndex,
+            edges,
+            nodes,
+            nodeMap,
+            source,
+            target,
+            start,
+            end,
+          });
           const isActive = activeLoopConnectionIds.has(edge.connection_id);
           const isHovered =
             hoverId !== null &&
@@ -274,7 +272,7 @@ export function SystemMapCanvas({
             <g key={edge.connection_id}>
               <title>{`${source.label} ${edge.relationship_type} ${target.label}: ${edge.explanation}`}</title>
               <path
-                d={`M ${start.x} ${start.y} Q ${control.x} ${control.y} ${end.x} ${end.y}`}
+                d={route.path}
                 stroke={style.stroke}
                 strokeWidth={isActive || isHovered ? "3" : "2"}
                 strokeOpacity={shouldDim ? 0.14 : isActive || isHovered ? 0.95 : 0.62}
@@ -282,9 +280,9 @@ export function SystemMapCanvas({
                 markerEnd={`url(#arrow-${edge.polarity === "+" ? "positive" : "negative"})`}
               />
               <rect
-                x={label.x - 14}
-                y={label.y - 12}
-                width="28"
+                x={route.label.x - 18}
+                y={route.label.y - 12}
+                width="36"
                 height="24"
                 rx="12"
                 fill={shouldDim ? "rgba(255,255,255,0.92)" : style.fill}
@@ -292,14 +290,14 @@ export function SystemMapCanvas({
                 strokeOpacity={shouldDim ? 0.12 : 0.24}
               />
               <text
-                x={label.x}
-                y={label.y + 4}
+                x={route.label.x}
+                y={route.label.y + 4}
                 textAnchor="middle"
-                fontSize="13"
+                fontSize="11"
                 fontWeight="700"
                 fill={shouldDim ? "#94a3b8" : style.label}
               >
-                {edge.polarity}
+                {edge.polarity}ve
               </text>
             </g>
           );
@@ -335,7 +333,7 @@ export function SystemMapCanvas({
               <rect
                 width={width}
                 height={height}
-                rx="18"
+                rx="20"
                 fill={
                   active
                     ? "rgba(29, 78, 216, 0.12)"
@@ -354,17 +352,17 @@ export function SystemMapCanvas({
               />
               <circle
                 cx="23"
-                cy="23"
-                r="8"
+                cy="24"
+                r="9"
                 fill="rgba(255,255,255,0.9)"
                 stroke={style.border}
                 strokeWidth="1"
               />
               <text
                 x="23"
-                y="27"
+                y="28"
                 textAnchor="middle"
-                fontSize="10"
+                fontSize="10.5"
                 fontWeight="800"
                 fill={style.text}
               >
@@ -372,7 +370,7 @@ export function SystemMapCanvas({
               </text>
               <text
                 x={width - 16}
-                y="27"
+                y="29"
                 textAnchor="end"
                 fontSize="10"
                 fontWeight="700"
@@ -382,9 +380,9 @@ export function SystemMapCanvas({
               </text>
               <text
                 x={width / 2}
-                y="48"
+                y="53"
                 textAnchor="middle"
-                fontSize="15"
+                fontSize="17"
                 fontWeight="800"
                 fill="#0f172a"
               >
@@ -459,11 +457,12 @@ function truncate(value: string, max: number) {
   return `${value.slice(0, max - 1)}…`;
 }
 
-function getNodeBox(node: Pick<GraphNode, "label" | "description">) {
-  void node;
-  const width = 86;
-  const height = 62;
-  return { width, height };
+type PositionedGraphNode = GraphNode & { x: number; y: number };
+
+function getNodeBox(node: Pick<GraphNode, "label" | "description"> & { x?: number; y?: number }) {
+  const width = 104;
+  const height = 72;
+  return { x: node.x ?? 0, y: node.y ?? 0, width, height };
 }
 
 function buildNodeInitials(label: string) {
@@ -512,6 +511,112 @@ function edgeAnchorPoint(
     x: from.x + dx * scale,
     y: from.y + dy * scale,
   };
+}
+
+function buildEdgeRoute({
+  edge,
+  edgeIndex,
+  edges,
+  nodes,
+  nodeMap,
+  source,
+  target,
+  start,
+  end,
+}: {
+  edge: GraphEdge;
+  edgeIndex: number;
+  edges: GraphEdge[];
+  nodes: GraphNode[];
+  nodeMap: Record<number, PositionedGraphNode>;
+  source: PositionedGraphNode;
+  target: PositionedGraphNode;
+  start: { x: number; y: number };
+  end: { x: number; y: number };
+}) {
+  const dx = end.x - start.x;
+  const dy = end.y - start.y;
+  const length = Math.max(Math.hypot(dx, dy), 1);
+  const normal = { x: -dy / length, y: dx / length };
+  const siblingEdges = edges.filter(
+    (item) =>
+      (item.source_node_id === edge.source_node_id &&
+        item.target_node_id === edge.target_node_id) ||
+      (item.source_node_id === edge.target_node_id && item.target_node_id === edge.source_node_id),
+  );
+  const siblingIndex = Math.max(
+    siblingEdges.findIndex((item) => item.connection_id === edge.connection_id),
+    0,
+  );
+  const siblingOffset = (siblingIndex - (siblingEdges.length - 1) / 2) * 22;
+  const directionOffset = source.x <= target.x ? 1 : -1;
+  const idOffset = ((edgeIndex % 5) - 2) * 7;
+  const baseOffset = Math.min(52, Math.max(22, length * 0.075));
+  let curveOffset = (baseOffset + Math.abs(siblingOffset) + Math.abs(idOffset)) * directionOffset;
+
+  const otherBoxes = nodes
+    .filter(
+      (node) =>
+        node.policy_node_id !== edge.source_node_id && node.policy_node_id !== edge.target_node_id,
+    )
+    .map((node) => {
+      const pos = nodeMap[node.policy_node_id];
+      return pos ? getNodeBox(pos) : null;
+    })
+    .filter((box): box is ReturnType<typeof getNodeBox> => Boolean(box));
+
+  for (let attempt = 0; attempt < 5; attempt += 1) {
+    const control = {
+      x: start.x + dx / 2 + normal.x * (curveOffset + siblingOffset + idOffset),
+      y: start.y + dy / 2 + normal.y * (curveOffset + siblingOffset + idOffset),
+    };
+    const crossesNode = otherBoxes.some((box) => curvePassesNearBox(start, control, end, box));
+    if (!crossesNode) {
+      return {
+        path: `M ${start.x} ${start.y} Q ${control.x} ${control.y} ${end.x} ${end.y}`,
+        label: {
+          x: start.x + dx / 2 + normal.x * (curveOffset + siblingOffset + idOffset + 18),
+          y: start.y + dy / 2 + normal.y * (curveOffset + siblingOffset + idOffset + 18),
+        },
+      };
+    }
+    curveOffset += 28 * directionOffset;
+  }
+
+  const control = {
+    x: start.x + dx / 2 + normal.x * (curveOffset + siblingOffset + idOffset),
+    y: start.y + dy / 2 + normal.y * (curveOffset + siblingOffset + idOffset),
+  };
+  return {
+    path: `M ${start.x} ${start.y} Q ${control.x} ${control.y} ${end.x} ${end.y}`,
+    label: {
+      x: start.x + dx / 2 + normal.x * (curveOffset + siblingOffset + idOffset + 18),
+      y: start.y + dy / 2 + normal.y * (curveOffset + siblingOffset + idOffset + 18),
+    },
+  };
+}
+
+function curvePassesNearBox(
+  start: { x: number; y: number },
+  control: { x: number; y: number },
+  end: { x: number; y: number },
+  box: { x: number; y: number; width: number; height: number },
+) {
+  const padding = 18;
+  for (let step = 1; step < 8; step += 1) {
+    const t = step / 8;
+    const x = (1 - t) ** 2 * start.x + 2 * (1 - t) * t * control.x + t ** 2 * end.x;
+    const y = (1 - t) ** 2 * start.y + 2 * (1 - t) * t * control.y + t ** 2 * end.y;
+    if (
+      x >= box.x - box.width / 2 - padding &&
+      x <= box.x + box.width / 2 + padding &&
+      y >= box.y - box.height / 2 - padding &&
+      y <= box.y + box.height / 2 + padding
+    ) {
+      return true;
+    }
+  }
+  return false;
 }
 
 function buildLoopPath(points: { x: number; y: number }[]) {
@@ -628,8 +733,8 @@ function relaxLayout(
     Object.entries(positions).map(([id, point]) => [Number(id), { ...point }]),
   );
   const nodeMap = new Map(nodes.map((node) => [node.policy_node_id, node]));
-  const bounds = { minX: 74, maxX: 1106, minY: 78, maxY: 682 };
-  const desiredGap = 108;
+  const bounds = { minX: 78, maxX: 1102, minY: 76, maxY: 684 };
+  const desiredGap = 146;
 
   for (let iteration = 0; iteration < 180; iteration += 1) {
     const forces: Record<number, { x: number; y: number }> = Object.fromEntries(
@@ -650,7 +755,7 @@ function relaxLayout(
           dy = (right.policy_node_id % 5) - 2 || 1;
           distance = Math.hypot(dx, dy);
         }
-        const repulsion = Math.min(16, (desiredGap * desiredGap) / (distance * distance));
+        const repulsion = Math.min(22, (desiredGap * desiredGap) / (distance * distance));
         forces[left.policy_node_id].x += (dx / distance) * repulsion;
         forces[left.policy_node_id].y += (dy / distance) * repulsion;
         forces[right.policy_node_id].x -= (dx / distance) * repulsion;
@@ -667,8 +772,8 @@ function relaxLayout(
       const dx = b.x - a.x;
       const dy = b.y - a.y;
       const distance = Math.max(Math.hypot(dx, dy), 1);
-      const preferred = source.level === target.level ? 170 : 250;
-      const pull = (distance - preferred) * 0.012;
+      const preferred = source.level === target.level ? 190 : 285;
+      const pull = (distance - preferred) * 0.009;
       forces[source.policy_node_id].x += (dx / distance) * pull;
       forces[source.policy_node_id].y += (dy / distance) * pull;
       forces[target.policy_node_id].x -= (dx / distance) * pull;
@@ -679,13 +784,13 @@ function relaxLayout(
       const point = next[node.policy_node_id];
       const force = forces[node.policy_node_id];
       const targetX = columns[node.level];
-      force.x += (targetX - point.x) * 0.025;
-      point.x = clamp(point.x + force.x * 0.42, bounds.minX, bounds.maxX);
-      point.y = clamp(point.y + force.y * 0.42, bounds.minY, bounds.maxY);
+      force.x += (targetX - point.x) * 0.02;
+      point.x = clamp(point.x + force.x * 0.36, bounds.minX, bounds.maxX);
+      point.y = clamp(point.y + force.y * 0.36, bounds.minY, bounds.maxY);
     }
   }
 
-  for (let pass = 0; pass < 28; pass += 1) {
+  for (let pass = 0; pass < 42; pass += 1) {
     for (let i = 0; i < nodes.length; i += 1) {
       for (let j = i + 1; j < nodes.length; j += 1) {
         const a = next[nodes[i].policy_node_id];

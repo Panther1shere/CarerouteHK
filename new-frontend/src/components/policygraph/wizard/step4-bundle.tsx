@@ -8,12 +8,14 @@ import {
   AlertCircle,
   ChevronDown,
   GitBranch,
+  Info,
   Network,
   Target,
   Users,
 } from "lucide-react";
 import { useWizard } from "./wizard-context";
 import { analyzePolicy, type PolicyAnalysis } from "@/lib/policygraph/analyze.functions";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 
 export function Step4Bundle() {
   const w = useWizard();
@@ -41,155 +43,196 @@ export function Step4Bundle() {
   if (!a) return null;
 
   return (
-    <div className="mx-auto max-w-6xl space-y-8">
-      <div>
-        <div className="font-mono text-[11px] uppercase tracking-[0.26em] text-primary">
-          Intervention
+    <TooltipProvider>
+      <div className="mx-auto max-w-6xl space-y-8">
+        <div>
+          <div className="font-mono text-[11px] uppercase tracking-[0.26em] text-primary">
+            Leverage points
+          </div>
         </div>
-      </div>
 
-      <div className="grid gap-4 xl:grid-cols-2">
-        {a.bundle.map((b, i) => {
-          const isOpen = openIdx === i;
-          const mapping = buildBundleMapping(a, b);
-          return (
-            <div
-              key={i}
-              className="rounded-3xl border hairline bg-white/78 shadow-[0_18px_42px_rgba(15,23,42,0.06)]"
-            >
-              <button
-                type="button"
-                onClick={() => setOpenIdx(isOpen ? null : i)}
-                className="flex w-full items-start justify-between gap-3 p-5 text-left"
+        <div className="grid gap-4 xl:grid-cols-2">
+          {a.bundle.map((b, i) => {
+            const isOpen = openIdx === i;
+            const mapping = buildBundleMapping(a, b);
+            return (
+              <div
+                key={i}
+                className="rounded-3xl border hairline bg-white/78 shadow-[0_18px_42px_rgba(15,23,42,0.06)]"
               >
-                <div>
-                  <div className="flex flex-wrap items-center gap-2">
-                    <span className="font-mono text-[10px] uppercase tracking-wider text-muted-foreground">
-                      {b.rank ?? i + 1}
-                    </span>
-                    {typeof b.confidence === "number" && (
-                      <span className="rounded-full bg-primary/8 px-2 py-0.5 font-mono text-[10px] uppercase tracking-wider text-primary">
-                        {Math.round(b.confidence * 100)}% confidence
+                <button
+                  type="button"
+                  onClick={() => setOpenIdx(isOpen ? null : i)}
+                  className="flex w-full items-start justify-between gap-3 p-5 text-left"
+                >
+                  <div>
+                    <div className="flex flex-wrap items-center gap-2">
+                      <span className="font-mono text-[10px] uppercase tracking-wider text-muted-foreground">
+                        {b.rank ?? i + 1}
                       </span>
+                      {typeof b.confidence === "number" && (
+                        <span className="rounded-full bg-primary/8 px-2 py-0.5 font-mono text-[10px] uppercase tracking-wider text-primary">
+                          {Math.round(b.confidence * 100)}% confidence
+                        </span>
+                      )}
+                    </div>
+                    <div className="mt-1 flex items-center gap-2">
+                      <div className="font-display text-xl font-semibold">
+                        {formatDisplayText(b.label)}
+                      </div>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <span className="inline-flex h-6 w-6 items-center justify-center rounded-full border hairline bg-white text-muted-foreground transition hover:text-primary">
+                            <Info className="h-3.5 w-3.5" />
+                          </span>
+                        </TooltipTrigger>
+                        <TooltipContent side="top" className="max-w-xs leading-5">
+                          {b.rationale ||
+                            "Recommended because this targets a root-cause node or relationship in the saved feedback loops, not only the visible symptom."}
+                        </TooltipContent>
+                      </Tooltip>
+                    </div>
+                    <p className="mt-2 max-w-xl text-sm leading-6 text-muted-foreground">
+                      {formatDisplayText(
+                        b.description ||
+                          b.rationale ||
+                          "Change the mapped system at the named pressure points, then monitor the downstream ripple.",
+                      )}
+                    </p>
+                    <div className="mt-3 flex flex-wrap gap-2">
+                      {mapping.interventionPoints.slice(0, 2).map((point) => (
+                        <Pill key={point} icon={Target} label={point} tone="primary" />
+                      ))}
+                      {mapping.nodeLabels.slice(0, 2).map((node) => (
+                        <Pill key={node} icon={Network} label={node} />
+                      ))}
+                    </div>
+                  </div>
+                  <ChevronDown
+                    className={`mt-2 h-4 w-4 shrink-0 text-muted-foreground transition-transform ${isOpen ? "rotate-180" : ""}`}
+                  />
+                </button>
+                {isOpen && (
+                  <div className="space-y-5 border-t hairline px-5 py-5">
+                    <div className="rounded-2xl border hairline bg-primary/5 p-4">
+                      <div className="font-mono text-[10px] uppercase tracking-[0.22em] text-primary">
+                        Leverage point
+                      </div>
+                      <p className="mt-2 text-sm leading-6 text-foreground">
+                        {buildActionText(b, mapping)}
+                      </p>
+                      {b.expectedSystemShift && (
+                        <p className="mt-2 text-sm leading-6 text-muted-foreground">
+                          {b.expectedSystemShift}
+                        </p>
+                      )}
+                    </div>
+
+                    <div className="grid gap-3 md:grid-cols-2">
+                      <MappingBlock
+                        icon={Target}
+                        label="Leverage"
+                        values={mapping.interventionPoints}
+                        empty="None"
+                      />
+                      <MappingBlock
+                        icon={Network}
+                        label="Nodes"
+                        values={mapping.nodeLabels}
+                        empty="None"
+                      />
+                      <MappingBlock
+                        icon={GitBranch}
+                        label="Loops"
+                        values={mapping.loopLabels}
+                        empty="None"
+                      />
+                      <MappingBlock
+                        icon={Users}
+                        label="Stakeholders"
+                        values={mapping.stakeholderLabels}
+                        empty="None"
+                      />
+                    </div>
+
+                    {mapping.ripple.length > 0 && (
+                      <div className="rounded-2xl border hairline bg-surface/60 p-4">
+                        <div className="font-mono text-[10px] uppercase tracking-[0.22em] text-primary">
+                          System ripple
+                        </div>
+                        <div className="mt-3 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+                          {mapping.ripple.map((step, index) => (
+                            <span
+                              key={`${step}-${index}`}
+                              className="inline-flex items-center gap-2"
+                            >
+                              <span className="rounded-full border hairline bg-white px-2.5 py-1 text-foreground">
+                                {step}
+                              </span>
+                              {index < mapping.ripple.length - 1 && (
+                                <ArrowRight className="h-3.5 w-3.5 text-primary" />
+                              )}
+                            </span>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    {(b.implementationNotes?.length ?? 0) > 0 && (
+                      <MappingBlock
+                        icon={ArrowRight}
+                        label="Delivery"
+                        values={b.implementationNotes ?? []}
+                        empty="None"
+                      />
+                    )}
+
+                    {(b.tradeoffs?.length ?? 0) > 0 && (
+                      <MappingBlock
+                        icon={AlertCircle}
+                        label="Watch"
+                        values={b.tradeoffs ?? []}
+                        empty="None"
+                      />
                     )}
                   </div>
-                  <div className="mt-1 font-display text-xl font-semibold">{b.label}</div>
-                  <div className="mt-3 flex flex-wrap gap-2">
-                    {mapping.interventionPoints.slice(0, 2).map((point) => (
-                      <Pill key={point} icon={Target} label={point} tone="primary" />
-                    ))}
-                    {mapping.nodeLabels.slice(0, 2).map((node) => (
-                      <Pill key={node} icon={Network} label={node} />
-                    ))}
-                  </div>
-                </div>
-                <ChevronDown
-                  className={`mt-2 h-4 w-4 shrink-0 text-muted-foreground transition-transform ${isOpen ? "rotate-180" : ""}`}
-                />
-              </button>
-              {isOpen && (
-                <div className="space-y-5 border-t hairline px-5 py-5">
-                  <div className="grid gap-3 md:grid-cols-2">
-                    <MappingBlock
-                      icon={Target}
-                      label="Points"
-                      values={mapping.interventionPoints}
-                      empty="None"
-                    />
-                    <MappingBlock
-                      icon={Network}
-                      label="Nodes"
-                      values={mapping.nodeLabels}
-                      empty="None"
-                    />
-                    <MappingBlock
-                      icon={GitBranch}
-                      label="Loops"
-                      values={mapping.loopLabels}
-                      empty="None"
-                    />
-                    <MappingBlock
-                      icon={Users}
-                      label="Stakeholders"
-                      values={mapping.stakeholderLabels}
-                      empty="None"
-                    />
-                  </div>
-
-                  {mapping.ripple.length > 0 && (
-                    <div className="rounded-2xl border hairline bg-surface/60 p-4">
-                      <div className="font-mono text-[10px] uppercase tracking-[0.22em] text-primary">
-                        Ripple
-                      </div>
-                      <div className="mt-3 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
-                        {mapping.ripple.map((step, index) => (
-                          <span key={`${step}-${index}`} className="inline-flex items-center gap-2">
-                            <span className="rounded-full border hairline bg-white px-2.5 py-1 text-foreground">
-                              {step}
-                            </span>
-                            {index < mapping.ripple.length - 1 && (
-                              <ArrowRight className="h-3.5 w-3.5 text-primary" />
-                            )}
-                          </span>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-
-                  {(b.implementationNotes?.length ?? 0) > 0 && (
-                    <MappingBlock
-                      icon={ArrowRight}
-                      label="Notes"
-                      values={b.implementationNotes ?? []}
-                      empty="None"
-                    />
-                  )}
-
-                  {(b.tradeoffs?.length ?? 0) > 0 && (
-                    <MappingBlock
-                      icon={AlertCircle}
-                      label="Tradeoffs"
-                      values={b.tradeoffs ?? []}
-                      empty="None"
-                    />
-                  )}
-                </div>
-              )}
-            </div>
-          );
-        })}
-      </div>
-
-      {run.error && (
-        <div className="flex items-start gap-2 rounded-lg border border-coral/40 bg-coral/10 px-3 py-2 text-sm">
-          <AlertCircle className="mt-0.5 h-4 w-4 shrink-0 text-coral" /> {run.error.message}
+                )}
+              </div>
+            );
+          })}
         </div>
-      )}
 
-      <div className="flex items-center justify-between border-t hairline pt-6">
-        <button
-          onClick={() => w.setStep(3)}
-          className="inline-flex items-center gap-2 rounded-xl border hairline px-4 py-2 text-sm text-muted-foreground hover:text-foreground"
-        >
-          <ArrowLeft className="h-4 w-4" /> Back
-        </button>
-        <button
-          onClick={() => run.mutate()}
-          disabled={run.isPending}
-          className="inline-flex items-center gap-2 rounded-xl bg-primary px-5 py-2.5 text-sm font-semibold text-primary-foreground hover:opacity-90 disabled:opacity-60"
-        >
-          {run.isPending ? (
-            <>
-              <Loader2 className="h-4 w-4 animate-spin" /> Simulating…
-            </>
-          ) : (
-            <>
-              Simulate intervention <ArrowRight className="h-4 w-4" />
-            </>
-          )}
-        </button>
+        {run.error && (
+          <div className="flex items-start gap-2 rounded-lg border border-coral/40 bg-coral/10 px-3 py-2 text-sm">
+            <AlertCircle className="mt-0.5 h-4 w-4 shrink-0 text-coral" /> {run.error.message}
+          </div>
+        )}
+
+        <div className="flex items-center justify-between border-t hairline pt-6">
+          <button
+            onClick={() => w.setStep(3)}
+            className="inline-flex items-center gap-2 rounded-xl border hairline px-4 py-2 text-sm text-muted-foreground hover:text-foreground"
+          >
+            <ArrowLeft className="h-4 w-4" /> Back
+          </button>
+          <button
+            onClick={() => run.mutate()}
+            disabled={run.isPending}
+            className="inline-flex items-center gap-2 rounded-xl bg-primary px-5 py-2.5 text-sm font-semibold text-primary-foreground hover:opacity-90 disabled:opacity-60"
+          >
+            {run.isPending ? (
+              <>
+                <Loader2 className="h-4 w-4 animate-spin" /> Simulating…
+              </>
+            ) : (
+              <>
+                Simulate leverage point <ArrowRight className="h-4 w-4" />
+              </>
+            )}
+          </button>
+        </div>
       </div>
-    </div>
+    </TooltipProvider>
   );
 }
 
@@ -272,6 +315,28 @@ function unique(values: string[]) {
   return [...new Set(values.map((value) => value.trim()).filter(Boolean))];
 }
 
+function buildActionText(bundle: BundleItem, mapping: ReturnType<typeof buildBundleMapping>) {
+  const point = formatDisplayText(mapping.interventionPoints[0] ?? "");
+  const nodes = mapping.nodeLabels.slice(0, 2).map(formatDisplayText).join(" and ");
+  const stakeholders = mapping.stakeholderLabels.slice(0, 2).map(formatDisplayText).join(" and ");
+  const rawAction = bundle.short || bundle.description || "";
+  const action = formatDisplayText(rawAction);
+
+  if (action && !isSlugLike(rawAction)) {
+    return action;
+  }
+  if (point && nodes && stakeholders) {
+    return `Use "${point}" to change ${nodes}, with implementation ownership focused on ${stakeholders}. This targets the causal system, not only the visible symptom.`;
+  }
+  if (point && nodes) {
+    return `Use "${point}" to change ${nodes}, then monitor whether connected nodes move in the expected direction.`;
+  }
+  if (point) {
+    return `Implement "${point}" as the concrete leverage change, then check the mapped ripple before scaling.`;
+  }
+  return "Treat this as a root-cause leverage point, not a broad policy theme; assign an owner, define a measurable threshold, and monitor the connected nodes.";
+}
+
 function Pill({
   icon: Icon,
   label,
@@ -290,7 +355,7 @@ function Pill({
       }`}
     >
       <Icon className="h-3 w-3" />
-      {label}
+      {formatDisplayText(label)}
     </span>
   );
 }
@@ -319,7 +384,7 @@ function MappingBlock({
               key={value}
               className="rounded-full border hairline bg-white px-2.5 py-1 text-xs text-foreground"
             >
-              {value}
+              {formatDisplayText(value)}
             </span>
           ))
         ) : (
@@ -328,4 +393,18 @@ function MappingBlock({
       </div>
     </div>
   );
+}
+
+function formatDisplayText(value: string) {
+  const cleaned = value.replace(/[_-]+/g, " ").replace(/\s+/g, " ").trim();
+  if (/[.!?]/.test(cleaned) || cleaned.length > 80) {
+    return cleaned;
+  }
+  return cleaned.replace(/\b[a-z]/g, (letter) => letter.toUpperCase());
+}
+
+function isSlugLike(value: string) {
+  const compact = value.trim();
+  if (!compact) return true;
+  return /^[a-z0-9-_\s]{1,40}$/.test(compact) && !compact.includes(".");
 }

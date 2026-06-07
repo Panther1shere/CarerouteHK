@@ -1,13 +1,13 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
+import type { CSSProperties } from "react";
 import {
   AlertCircle,
   CircleUser,
   FileText,
   FolderKanban,
   History,
-  House,
   LayoutDashboard,
   Settings,
 } from "lucide-react";
@@ -54,7 +54,7 @@ const primaryNav = [
 function AppShell() {
   return (
     <WizardProvider>
-      <SidebarProvider defaultOpen>
+      <SidebarProvider defaultOpen style={{ "--sidebar-width": "18rem" } as CSSProperties}>
         <SidebarFrame collapsible="icon" className="border-r nav-divider bg-transparent">
           <WorkspaceSidebar />
           <SidebarRail />
@@ -97,7 +97,7 @@ function WorkspaceSidebar() {
 
   return (
     <div className="nav-rail flex h-full flex-col overflow-hidden">
-      <div className="border-b nav-divider px-5 pb-5 pt-6 group-data-[collapsible=icon]:px-2">
+      <div className="border-b nav-divider px-4 pb-4 pt-5 group-data-[collapsible=icon]:px-2">
         <div className="flex items-start gap-3">
           <div className="relative mt-0.5 h-11 w-11 shrink-0 rounded-xl border border-white/10 bg-white/4 shadow-[inset_0_1px_0_rgba(255,255,255,0.06)]">
             <div className="absolute inset-[8px] rounded-lg border border-white/20" />
@@ -113,11 +113,12 @@ function WorkspaceSidebar() {
               Housing policy workspace
             </div>
           </div>
+          <SidebarTrigger className="ml-auto h-8 w-8 shrink-0 rounded-full border border-white/8 bg-white/5 text-slate-200 hover:bg-white/10 hover:text-white group-data-[collapsible=icon]:hidden" />
         </div>
       </div>
 
-      <div className="flex-1 overflow-y-auto px-4 py-5">
-        <div className="mb-8">
+      <div className="flex-1 overflow-y-auto px-4 py-4">
+        <div className="mb-5">
           <div className="px-3 pb-3 font-mono text-[10px] uppercase tracking-[0.28em] text-slate-300/58 group-data-[collapsible=icon]:hidden">
             Primary navigation
           </div>
@@ -137,8 +138,8 @@ function WorkspaceSidebar() {
           </nav>
         </div>
 
-        <div className="mb-8 group-data-[collapsible=icon]:hidden">
-          <div className="flex items-center justify-between px-3 pb-3">
+        <div className="group-data-[collapsible=icon]:hidden">
+          <div className="flex items-center justify-between px-2 pb-2">
             <div className="font-mono text-[10px] uppercase tracking-[0.28em] text-slate-300/58">
               Saved analyses
             </div>
@@ -161,25 +162,6 @@ function WorkspaceSidebar() {
               Could not load that saved analysis.
             </div>
           )}
-        </div>
-
-        <div className="group-data-[collapsible=icon]:hidden">
-          <div className="px-3 pb-3 font-mono text-[10px] uppercase tracking-[0.28em] text-slate-300/58">
-            Workspace
-          </div>
-          <div className="rounded-2xl border border-white/6 bg-white/[0.035] px-4 py-4">
-            <div className="flex items-center gap-3">
-              <div className="grid h-9 w-9 place-items-center rounded-lg border border-white/8 bg-white/6">
-                <House className="h-4 w-4 stroke-[1.8] text-slate-200/84" />
-              </div>
-              <div>
-                <div className="text-sm font-medium text-slate-100/92">Hong Kong Housing</div>
-                <div className="mt-1 font-mono text-[10px] uppercase tracking-[0.22em] text-slate-400/72">
-                  Sandbox module
-                </div>
-              </div>
-            </div>
-          </div>
         </div>
       </div>
 
@@ -208,11 +190,11 @@ function PolicyHistoryList({
 }) {
   if (isLoading) {
     return (
-      <div className="space-y-2">
-        {[0, 1, 2].map((index) => (
+      <div className="space-y-1.5">
+        {[0, 1, 2, 3].map((index) => (
           <div
             key={index}
-            className="h-[74px] animate-pulse rounded-xl border border-white/6 bg-white/[0.035]"
+            className="h-12 animate-pulse rounded-lg border border-white/6 bg-white/[0.035]"
           />
         ))}
       </div>
@@ -236,21 +218,21 @@ function PolicyHistoryList({
   }
 
   return (
-    <ul className="max-h-[42vh] space-y-2 overflow-y-auto pr-1">
+    <ul className="max-h-[52vh] space-y-1.5 overflow-y-auto pr-1">
       {policies.map((policy) => (
         <li key={policy.policy_id}>
           <button
             type="button"
             onClick={() => onSelectPolicy(policy.policy_id)}
             disabled={loadingPolicyId === policy.policy_id}
-            className="group flex w-full min-w-0 items-start gap-3 rounded-xl border border-white/6 bg-white/[0.03] px-4 py-3 text-left transition hover:border-white/10 hover:bg-white/[0.055] disabled:opacity-65"
+            className="group flex w-full min-w-0 items-start gap-2.5 rounded-lg border border-white/6 bg-white/[0.025] px-3 py-2 text-left transition hover:border-white/10 hover:bg-white/[0.055] disabled:opacity-65"
           >
-            <History className="mt-0.5 h-[16px] w-[16px] shrink-0 stroke-[1.8] text-slate-400/80 transition group-hover:text-slate-200" />
+            <History className="mt-0.5 h-3.5 w-3.5 shrink-0 stroke-[1.8] text-slate-400/72 transition group-hover:text-slate-200" />
             <div className="min-w-0 flex-1">
-              <span className="block truncate text-sm font-medium leading-5 text-slate-100/88">
+              <span className="block truncate text-xs font-medium leading-4 text-slate-100/84">
                 {policy.text_preview}
               </span>
-              <span className="mt-1 block font-mono text-[10px] uppercase tracking-[0.2em] text-slate-400/68">
+              <span className="mt-0.5 block truncate font-mono text-[9px] uppercase tracking-[0.16em] text-slate-400/62">
                 {formatHistoryDate(policy.created_at)} · {policy.node_count} nodes ·{" "}
                 {policy.feedback_loop_count} loops
               </span>

@@ -9,13 +9,19 @@ import {
   PencilLine,
   Save,
   X,
+  Link2,
+  GitBranch,
+  Network,
+  Target,
 } from "lucide-react";
 
 import {
   addPolicyNote,
   updatePolicyNode,
   updatePolicyNote,
+  type GraphEdge,
   type GraphFeedbackLoop,
+  type GraphNode,
   type GraphNote,
   type PolicyGraphPayload,
 } from "@/lib/policygraph/analyze.functions";
@@ -175,20 +181,8 @@ export function Step3SystemMap() {
       <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
         <div>
           <div className="font-mono text-[11px] uppercase tracking-[0.26em] text-primary">
-            Complete picture
+            Map the whole system
           </div>
-          {graph.interventionPoints.length > 0 && (
-            <div className="mt-4 flex max-w-4xl flex-wrap gap-2">
-              {graph.interventionPoints.slice(0, 5).map((point) => (
-                <span
-                  key={point}
-                  className="rounded-full border border-primary/18 bg-primary/6 px-3 py-1.5 text-[11px] font-medium text-primary"
-                >
-                  {point}
-                </span>
-              ))}
-            </div>
-          )}
         </div>
 
         <div className="flex flex-wrap items-center gap-3">
@@ -205,6 +199,13 @@ export function Step3SystemMap() {
           </button>
         </div>
       </div>
+
+      <SystemMethodStrip
+        nodeCount={graph.nodes.length}
+        connectionCount={graph.edges.length}
+        loopCount={graph.feedbackLoops.length}
+        leveragePoints={graph.interventionPoints}
+      />
 
       <section className="relative overflow-hidden rounded-[32px] border hairline bg-white shadow-[0_28px_70px_rgba(15,23,42,0.08)]">
         <div className="flex items-center justify-end border-b hairline px-6 py-4">
@@ -274,40 +275,43 @@ export function Step3SystemMap() {
 
       {graph.feedbackLoops.length > 0 || fallbackLoops.length > 0 ? (
         <section className="space-y-5">
-          <div className="font-mono text-[10px] uppercase tracking-[0.22em] text-primary">
-            Loops
+          <div className="flex items-center justify-between gap-3">
+            <div className="font-mono text-[10px] uppercase tracking-[0.22em] text-primary">
+              Feedback loops
+            </div>
+            <div className="text-xs text-muted-foreground">
+              Click a loop to inspect the details.
+            </div>
           </div>
 
           <div className="grid gap-5 xl:grid-cols-2">
             {graph.feedbackLoops.length > 0
-              ? graph.feedbackLoops.map((loop, index) => (
-                  <button
-                    key={loop.feedback_loop_id}
-                    type="button"
-                    onClick={() => openLoop(loop.feedback_loop_id)}
-                    className="w-full text-left"
-                  >
-                    <FeedbackLoopCard
-                      loop={{
-                        id: loop.loop_key ?? `loop-${loop.feedback_loop_id}`,
-                        title: loop.loop_name,
-                        type: loop.loop_type === "reinforcing" ? "R" : "B",
-                        chain: loop.involved_node_ids.map((nodeId) => ({
-                          node:
-                            graph.nodes.find((node) => node.policy_node_id === nodeId)?.label ??
-                            `Node ${nodeId}`,
-                          effect:
-                            graph.edges.find(
-                              (edge) =>
-                                edge.source_node_id === nodeId || edge.target_node_id === nodeId,
-                            )?.relationship_type ?? "influences",
-                        })),
-                        summary: "",
-                      }}
-                      index={index}
-                    />
-                  </button>
-                ))
+              ? graph.feedbackLoops.map((loop, index) => {
+                  const loopView = buildLoopCardModel(loop, graph.nodes, graph.edges);
+                  return (
+                    <button
+                      key={loop.feedback_loop_id}
+                      type="button"
+                      onClick={() => openLoop(loop.feedback_loop_id)}
+                      className={`w-full rounded-[26px] text-left transition ${
+                        selectedLoopId === loop.feedback_loop_id
+                          ? "ring-2 ring-primary/35"
+                          : "hover:-translate-y-0.5"
+                      }`}
+                    >
+                      <FeedbackLoopCard
+                        loop={{
+                          id: loop.loop_key ?? `loop-${loop.feedback_loop_id}`,
+                          title: loop.loop_name,
+                          type: loop.loop_type === "reinforcing" ? "R" : "B",
+                          chain: loopView.chain,
+                          summary: loopView.summary,
+                        }}
+                        index={index}
+                      />
+                    </button>
+                  );
+                })
               : fallbackLoops.map((loop, index) => (
                   <div key={loop.id} className="w-full text-left">
                     <FeedbackLoopCard loop={loop} index={index} />
@@ -337,6 +341,8 @@ export function Step3SystemMap() {
         mode={inspectorMode}
         selectedNode={selectedNode}
         selectedLoop={selectedLoop}
+        nodes={graph.nodes}
+        edges={graph.edges}
         stakeholderNames={stakeholderNames}
         relatedNotes={relatedNotes}
         noteDraft={noteDraft}
@@ -373,11 +379,71 @@ function MetricPill({ label, value }: { label: string; value: number }) {
   );
 }
 
+function SystemMethodStrip({
+  nodeCount,
+  connectionCount,
+  loopCount,
+  leveragePoints,
+}: {
+  nodeCount: number;
+  connectionCount: number;
+  loopCount: number;
+  leveragePoints: string[];
+}) {
+  return (
+    <div className="grid gap-3 lg:grid-cols-3">
+      <MethodCard
+        icon={Network}
+        label="1. System"
+        title={`${nodeCount} nodes · ${connectionCount} links`}
+        detail="Stakeholders, market actors, institutions, bottlenecks, and outcomes."
+      />
+      <MethodCard
+        icon={GitBranch}
+        label="2. Loops"
+        title={`${loopCount} feedback loop${loopCount === 1 ? "" : "s"}`}
+        detail="R amplifies pressure. B stabilizes or pushes back."
+      />
+      <MethodCard
+        icon={Target}
+        label="3. Leverage"
+        title={leveragePoints[0] ?? "Find root causes"}
+        detail="Act where one change shifts the downstream system, not only the symptom."
+      />
+    </div>
+  );
+}
+
+function MethodCard({
+  icon: Icon,
+  label,
+  title,
+  detail,
+}: {
+  icon: typeof Network;
+  label: string;
+  title: string;
+  detail: string;
+}) {
+  return (
+    <div className="rounded-3xl border hairline bg-white/78 p-4 shadow-[0_14px_34px_rgba(15,23,42,0.05)]">
+      <div className="flex items-center gap-2 font-mono text-[10px] uppercase tracking-[0.22em] text-primary">
+        <Icon className="h-3.5 w-3.5" />
+        {label}
+      </div>
+      <div className="mt-2 text-sm font-semibold text-foreground">{title}</div>
+      <p className="mt-1 text-xs leading-5 text-muted-foreground">{detail}</p>
+    </div>
+  );
+}
+
 function InspectorDrawer({
   open,
   mode,
   selectedNode,
   selectedLoop,
+  nodes,
+  edges,
   stakeholderNames,
   relatedNotes,
   noteDraft,
@@ -397,6 +463,8 @@ function InspectorDrawer({
   mode: InspectorMode | null;
   selectedNode: PolicyGraphPayload["nodes"][number] | null;
   selectedLoop: GraphFeedbackLoop | null;
+  nodes: GraphNode[];
+  edges: GraphEdge[];
   stakeholderNames: Map<number, string>;
   relatedNotes: GraphNote[];
   noteDraft: string;
@@ -412,6 +480,12 @@ function InspectorDrawer({
   isSavingNote: boolean;
   policySummary: string;
 }) {
+  const nodeConnections = selectedNode
+    ? buildNodeConnections(selectedNode.policy_node_id, nodes, edges)
+    : [];
+  const loopConnections = selectedLoop ? buildLoopConnections(selectedLoop, nodes, edges) : [];
+  const loopPath = selectedLoop ? buildLoopPathSummary(selectedLoop, nodes) : "";
+
   return (
     <div
       className={`fixed inset-0 z-40 transition ${open ? "pointer-events-auto" : "pointer-events-none"}`}
@@ -465,8 +539,7 @@ function InspectorDrawer({
           <div className="flex-1 space-y-6 overflow-y-auto px-6 py-6">
             {mode === "node" && selectedNode ? (
               <section className="space-y-3">
-                <InspectorMeta label="Level" value={selectedNode.level} />
-                <InspectorMeta label="Category" value={selectedNode.category} />
+                <InspectorMeta label="Why this factor matters" value={selectedNode.description} />
                 <InspectorMeta
                   label="Related stakeholders"
                   value={
@@ -481,8 +554,28 @@ function InspectorDrawer({
               </section>
             ) : null}
 
+            {mode === "node" && selectedNode ? (
+              <section className="space-y-3">
+                <SectionEyebrow icon={Link2} label="Connections" />
+                {nodeConnections.length > 0 ? (
+                  nodeConnections.map((connection) => (
+                    <RelationshipCard
+                      key={`${connection.direction}-${connection.edge.connection_id}`}
+                      edge={connection.edge}
+                      sourceLabel={connection.sourceLabel}
+                      targetLabel={connection.targetLabel}
+                      direction={connection.direction}
+                    />
+                  ))
+                ) : (
+                  <EmptyInspectorBlock label="No direct connections are stored for this node." />
+                )}
+              </section>
+            ) : null}
+
             {mode === "loop" && selectedLoop ? (
               <section className="space-y-3">
+                <LoopMeaningCard loop={selectedLoop} loopPath={loopPath} />
                 <InspectorMeta
                   label="Loop type"
                   value={
@@ -507,6 +600,26 @@ function InspectorDrawer({
                       : "No linked stakeholders"
                   }
                 />
+                <InspectorMeta label="How the loop forms" value={selectedLoop.explanation} />
+                {loopPath && <InspectorMeta label="Loop path" value={loopPath} />}
+              </section>
+            ) : null}
+
+            {mode === "loop" && selectedLoop ? (
+              <section className="space-y-3">
+                <SectionEyebrow icon={Link2} label="Loop connections" />
+                {loopConnections.length > 0 ? (
+                  loopConnections.map((connection) => (
+                    <RelationshipCard
+                      key={connection.edge.connection_id}
+                      edge={connection.edge}
+                      sourceLabel={connection.sourceLabel}
+                      targetLabel={connection.targetLabel}
+                    />
+                  ))
+                ) : (
+                  <EmptyInspectorBlock label="No connection details are linked to this loop." />
+                )}
               </section>
             ) : null}
 
@@ -627,6 +740,172 @@ function InspectorMeta({ label, value }: { label: string; value: string }) {
       <div className="mt-1 text-sm leading-6 text-foreground">{value}</div>
     </div>
   );
+}
+
+function SectionEyebrow({ icon: Icon, label }: { icon: typeof Link2; label: string }) {
+  return (
+    <div className="flex items-center gap-2 font-mono text-[10px] uppercase tracking-[0.22em] text-primary">
+      <Icon className="h-3.5 w-3.5" />
+      {label}
+    </div>
+  );
+}
+
+function EmptyInspectorBlock({ label }: { label: string }) {
+  return (
+    <div className="rounded-3xl border border-dashed hairline bg-surface px-4 py-5 text-sm text-muted-foreground">
+      {label}
+    </div>
+  );
+}
+
+function LoopMeaningCard({ loop, loopPath }: { loop: GraphFeedbackLoop; loopPath: string }) {
+  const reinforcing = loop.loop_type === "reinforcing";
+  return (
+    <div
+      className={`rounded-3xl border p-4 shadow-[0_12px_28px_rgba(15,23,42,0.05)] ${
+        reinforcing ? "border-blue-200 bg-blue-50/70" : "border-teal-200 bg-teal-50/70"
+      }`}
+    >
+      <div className="font-mono text-[10px] uppercase tracking-[0.22em] text-primary">
+        {reinforcing ? "Reinforcing loop" : "Balancing loop"}
+      </div>
+      <p className="mt-2 text-sm leading-6 text-foreground">
+        {reinforcing
+          ? "This loop keeps amplifying itself. If one pressure rises, connected pressures tend to rise with it until a leverage point breaks the cycle."
+          : "This loop pushes back against pressure. It can stabilize the system if the stabilizing response is fast and strong enough."}
+      </p>
+      {loopPath && <p className="mt-2 text-xs leading-5 text-muted-foreground">{loopPath}</p>}
+    </div>
+  );
+}
+
+function RelationshipCard({
+  edge,
+  sourceLabel,
+  targetLabel,
+  direction,
+}: {
+  edge: GraphEdge;
+  sourceLabel: string;
+  targetLabel: string;
+  direction?: "incoming" | "outgoing";
+}) {
+  const polarityText =
+    edge.polarity === "+"
+      ? "+ve: the source increases or strengthens the target"
+      : "-ve: the source reduces or weakens the target";
+  return (
+    <div className="rounded-3xl border hairline bg-white/80 p-4 shadow-[0_12px_28px_rgba(15,23,42,0.05)]">
+      <div className="flex flex-wrap items-center gap-2">
+        {direction && (
+          <span className="rounded-full border hairline bg-surface px-2.5 py-1 font-mono text-[10px] uppercase tracking-wider text-muted-foreground">
+            {direction}
+          </span>
+        )}
+        <PolarityBadge polarity={edge.polarity} />
+        <span className="text-xs font-medium text-muted-foreground">{edge.relationship_type}</span>
+      </div>
+      <div className="mt-3 flex items-center gap-2 text-sm font-semibold text-foreground">
+        <span>{sourceLabel}</span>
+        <ArrowRight className="h-3.5 w-3.5 shrink-0 text-primary" />
+        <span>{targetLabel}</span>
+      </div>
+      <p className="mt-2 text-sm leading-6 text-muted-foreground">{edge.explanation}</p>
+      <p className="mt-2 text-xs leading-5 text-muted-foreground">{polarityText}.</p>
+    </div>
+  );
+}
+
+function PolarityBadge({ polarity }: { polarity: "+" | "-" }) {
+  const positive = polarity === "+";
+  return (
+    <span
+      className={`rounded-full px-2.5 py-1 font-mono text-[10px] font-semibold uppercase tracking-wider ${
+        positive ? "bg-emerald-50 text-emerald-700" : "bg-rose-50 text-rose-700"
+      }`}
+    >
+      {positive ? "+ve" : "-ve"}
+    </span>
+  );
+}
+
+function buildNodeConnections(nodeId: number, nodes: GraphNode[], edges: GraphEdge[]) {
+  const nodeById = new Map(nodes.map((node) => [node.policy_node_id, node.label]));
+  return edges
+    .filter((edge) => edge.source_node_id === nodeId || edge.target_node_id === nodeId)
+    .slice(0, 8)
+    .map((edge) => ({
+      edge,
+      direction: edge.source_node_id === nodeId ? "outgoing" : "incoming",
+      sourceLabel: nodeById.get(edge.source_node_id) ?? `Node ${edge.source_node_id}`,
+      targetLabel: nodeById.get(edge.target_node_id) ?? `Node ${edge.target_node_id}`,
+    }));
+}
+
+function buildLoopConnections(loop: GraphFeedbackLoop, nodes: GraphNode[], edges: GraphEdge[]) {
+  const connectionIds = new Set(loop.involved_connection_ids);
+  const nodeById = new Map(nodes.map((node) => [node.policy_node_id, node.label]));
+  return edges
+    .filter((edge) => connectionIds.has(edge.connection_id))
+    .map((edge) => ({
+      edge,
+      sourceLabel: nodeById.get(edge.source_node_id) ?? `Node ${edge.source_node_id}`,
+      targetLabel: nodeById.get(edge.target_node_id) ?? `Node ${edge.target_node_id}`,
+    }));
+}
+
+function buildLoopPathSummary(loop: GraphFeedbackLoop, nodes: GraphNode[]) {
+  const nodeById = new Map(nodes.map((node) => [node.policy_node_id, node.label]));
+  return loop.involved_node_ids
+    .map((nodeId) => nodeById.get(nodeId) ?? `Node ${nodeId}`)
+    .join(" -> ");
+}
+
+function buildLoopCardModel(loop: GraphFeedbackLoop, nodes: GraphNode[], edges: GraphEdge[]) {
+  const connectionIds = new Set(loop.involved_connection_ids);
+  const loopEdges = edges.filter((edge) => connectionIds.has(edge.connection_id));
+  const nodeById = new Map(nodes.map((node) => [node.policy_node_id, node.label]));
+  const chain =
+    loopEdges.length > 0
+      ? loopEdges.map((edge) => ({
+          node: nodeById.get(edge.source_node_id) ?? `Node ${edge.source_node_id}`,
+          effect: `${edge.polarity}ve ${edge.relationship_type.toLowerCase()} -> ${
+            nodeById.get(edge.target_node_id) ?? `Node ${edge.target_node_id}`
+          }`,
+        }))
+      : loop.involved_node_ids.map((nodeId) => ({
+          node: nodeById.get(nodeId) ?? `Node ${nodeId}`,
+          effect: "part of this feedback loop",
+        }));
+
+  return {
+    chain,
+    summary: buildLoopSummary(loop, loopEdges, nodeById),
+  };
+}
+
+function buildLoopSummary(
+  loop: GraphFeedbackLoop,
+  loopEdges: GraphEdge[],
+  nodeById: Map<number, string>,
+) {
+  const typeLabel =
+    loop.loop_type === "reinforcing"
+      ? "Reinforcing: the cycle amplifies pressure unless a leverage point interrupts it."
+      : "Balancing: the cycle pushes back against pressure and can stabilize the system.";
+  const path =
+    loopEdges.length > 0
+      ? loopEdges
+          .map(
+            (edge) =>
+              `${nodeById.get(edge.source_node_id) ?? `Node ${edge.source_node_id}`} ${
+                edge.polarity
+              }ve -> ${nodeById.get(edge.target_node_id) ?? `Node ${edge.target_node_id}`}`,
+          )
+          .join(" · ")
+      : "";
+  return [typeLabel, loop.explanation, path].filter(Boolean).join(" ");
 }
 
 function resolveRelatedNotes(

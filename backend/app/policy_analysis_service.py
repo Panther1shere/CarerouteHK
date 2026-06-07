@@ -64,23 +64,46 @@ Rules:
 - Exclude generic filler. Every stakeholder must explain a concrete motivation, constraint, resource dependency,
   or accountability relationship that matters for implementation.
 - Build a system map that is useful for intervention design, not just a stakeholder inventory.
-- Build nodes that represent system stakeholders/entities affected by policy plus the resources, stocks,
+- Think in three stages:
+  1. Map the whole system: stakeholders, real-world factors, institutions, market actors, funding channels,
+     delivery bottlenecks, and public outcomes.
+  2. Identify feedback loops: reinforcing loops where pressure accelerates, and balancing loops where the
+     system pushes back or stabilizes.
+  3. Find leverage points: root-cause nodes or relationships where a specific government action can shift
+     the whole loop, not just mask a symptom.
+- Build nodes that represent tangible system stakeholders/entities affected by policy plus the resources, stocks,
   institutions, bottlenecks, pressures, and public outcomes they influence.
 - Build 8 to 14 distinct nodes unless the policy is unusually simple.
-- Prefer concrete labels such as "Rent Level", "Construction Capacity", "Permit Delay", "Tenant Stress",
-  "Public Housing Supply", or "Land Availability" over vague labels such as "market issue".
+- Use clear real-world node labels a decision-maker can recognize on sight. Prefer concrete labels such as
+  "Private Landlords", "Public Rental Housing Queue", "Building Department Permit Review",
+  "Construction Labour Capacity", "Low-income Tenant Rent Stress", "Vacant Private Flats",
+  "Land Availability", or "District Transport Capacity".
+- Do not use vague nodes such as "Policy", "Economy", "Community", "Market Issue", "Outcome",
+  "Stakeholders", "Implementation", or "Public Reaction" unless the label names the specific actor,
+  stock, bottleneck, service, institution, or measurable condition.
+- Node descriptions must explain why that factor exists in the real system, who controls or experiences it,
+  and why changing it would matter.
 - Build connections that describe influence, dependency, conflict, cooperation, information flow,
   money flow, resource flow, or policy impact.
 - Each connection must show cause and effect: how the source changes the target, which stakeholder/entity is affected,
   and why that matters for the policy outcome.
+- Relationship explanations must be readable in an inspector panel and explicitly describe whether the source
+  increases/strengthens the target (+) or reduces/weakens the target (-).
 - Avoid disconnected decorative edges. Every connection must help explain a real ripple effect or implementation risk.
 - Connections must use polarity "+" or "-" only, never numeric strength values.
 - "+" means the source increases or strengthens the target. "-" means the source reduces or weakens the target.
 - Detect feedback loops only when they are meaningfully grounded in the policy and generated nodes.
 - If the policy implies a cycle, make that cycle explicit through the nodes, connections, and saved feedback loops.
 - Feedback loops should capture the cycles that matter for later intervention design.
+- Feedback-loop explanations must describe how the loop forms in the real world, what keeps it going,
+  and whether it amplifies pressure (reinforcing) or stabilizes pressure (balancing).
 - Possible intervention points must be specific policy, regulatory, funding, enforcement, data-sharing,
   sequencing, or delivery levers. Name the exact node or relationship they are meant to change.
+- Phrase intervention points as actions, for example "Set service-level targets for Building Department Permit Review"
+  or "Fund surge capacity for Construction Labour Capacity", not as abstract themes.
+- Prefer strong leverage points over weak symptom treatment. For example, if the map shows permit delay ->
+  project delay -> low supply -> high prices, recommend reducing permit approval time with a measurable target,
+  not only temporary subsidies for high prices.
 - The full map should let a decision-maker trace: policy lever -> affected node/entity -> downstream nodes ->
   feedback loop or public outcome.
 - Write short but meaningful fields, usually one to three sentences each.
@@ -884,7 +907,7 @@ class PolicyAnalysisService:
             items.append(
                 FrontendBundleItem(
                     label=recommendation.title,
-                    short=recommendation.intervention_key[:24],
+                    short=recommendation.recommended_action,
                     description=recommendation.recommended_action,
                     rationale=recommendation.reason,
                     intervention_key=recommendation.intervention_key,
@@ -904,7 +927,7 @@ class PolicyAnalysisService:
             items.append(
                 FrontendBundleItem(
                     label=suggestion.title,
-                    short=suggestion.enhancement_key[:24],
+                    short=suggestion.what_to_add[:220],
                     description=suggestion.what_to_add,
                     rationale=suggestion.reason,
                     intervention_key=suggestion.enhancement_key,
@@ -1201,12 +1224,12 @@ class PolicyAnalysisService:
         loop_count = len(policy.feedback_loops)
         if loop_count == 0:
             return (
-                f"Prioritize {top.title} first. No explicit feedback loops were captured in the saved map, "
+                f"Prioritize {top.title} first as the strongest leverage point. No explicit feedback loops were captured in the saved map, "
                 "so this ranking is grounded in node centrality, stakeholder exposure, and the strongest "
-                "causal pressure points in the graph."
+                "causal pressure points in the graph rather than symptom treatment."
             )
         return (
-            f"Prioritize {top.title} first. It has the strongest grounding in the current system map "
+            f"Prioritize {top.title} first as the strongest leverage point. It has the strongest grounding in the current system map "
             f"because it addresses {len(top.targeted_feedback_loop_ids)} feedback loop(s), focuses on "
             f"{len(top.affected_stakeholder_ids)} stakeholder group(s), and acts on the most connected pressure "
             f"nodes. The current policy map contains "
@@ -1222,8 +1245,8 @@ class PolicyAnalysisService:
             if node_id in node_map
         ]
         if labels:
-            return f"Coordinate pressure around {' and '.join(labels[:2])}"
-        return f"Stabilize {loop.loop_name}"
+            return f"Change the leverage relationship around {' and '.join(labels[:2])}"
+        return f"Change the leverage point inside {loop.loop_name}"
 
     def _select_fallback_nodes(
         self,
@@ -1330,10 +1353,10 @@ class PolicyAnalysisService:
     ) -> str:
         if nodes:
             return (
-                f"Use {title.lower()} to directly change pressure on "
-                f"{', '.join(node.label for node in nodes[:2])}."
+                f"Use {title.lower()} as a leverage-point intervention that directly changes "
+                f"{', '.join(node.label for node in nodes[:2])}, then monitor the downstream loop response."
             )
-        return f"Use {title.lower()} as a targeted intervention rather than a broad policy change."
+        return f"Use {title.lower()} as a root-cause intervention rather than a broad symptom response."
 
     def _build_intervention_reason(
         self,
@@ -1361,7 +1384,7 @@ class PolicyAnalysisService:
         return (
             f"We are recommending {title.lower()} because it directly addresses {loop_phrase}, "
             f"which is pushing pressure through {node_phrase}. That matters for {stakeholder_phrase}, "
-            "and it changes a leverage point that can shift the wider system rather than a single isolated symptom."
+            "and it changes a root-cause leverage point that can shift the wider system rather than temporarily masking one symptom."
         )
 
     def _build_expected_shift(
@@ -1413,7 +1436,7 @@ class PolicyAnalysisService:
         return round(min(raw, 0.94), 2)
 
     def _title_case_intervention(self, value: str) -> str:
-        stripped = value.strip()
+        stripped = re.sub(r"[_-]+", " ", value.strip())
         if not stripped:
             return "Intervention Recommendation"
         if re.search(r"[A-Z]", stripped):
