@@ -1,7 +1,10 @@
+import asyncio
 import json
 from collections import defaultdict
 from datetime import UTC, datetime
 import re
+from urllib.parse import quote
+from urllib.request import Request, urlopen
 
 from fastapi import HTTPException
 from openai import AsyncOpenAI, OpenAIError
@@ -15,6 +18,20 @@ from app.schemas import (
     PolicyDeleteResponse,
     PolicyEnhancementAnalysisResponse,
     PolicyEnhancementSuggestion,
+    FrontendBundleItem,
+    FrontendChatRequest,
+    FrontendChatResponse,
+    FrontendDataset,
+    FrontendDatasetSearchResponse,
+    FrontendImpact,
+    FrontendLoop,
+    FrontendLoopChainStep,
+    FrontendPolicyAnalysisRequest,
+    FrontendPolicyAnalysisResponse,
+    FrontendPolicySummary,
+    FrontendStakeholder,
+    FrontendWarning,
+    FrontendAnalysisRow,
     PolicyGraphResponse,
     PolicyInterventionAnalysisResponse,
     PolicyInterventionRecommendation,
@@ -52,6 +69,17 @@ Rules:
 - The policy domain should be treated as housing unless the policy text clearly broadens scope.
 """
 
+FRONTEND_CHAT_SYSTEM_PROMPT = """
+You are the PolicyGraph HK assistant: a grounded, concise policy analyst.
+
+Rules:
+- Stay grounded in the supplied policy, datasets, and current analysis summary.
+- Be specific to Hong Kong housing policy.
+- Keep answers under 200 words unless the user explicitly asks for more.
+- If the current sources do not support a claim, say so directly and suggest what dataset or evidence is missing.
+- When suggesting actions, phrase them as concrete next steps for the analyst.
+"""
+
 
 class PolicyAnalysisService:
     def __init__(self, repository: PolicyAnalysisRepository, settings: Settings):
@@ -75,6 +103,94 @@ class PolicyAnalysisService:
             llm_model=self.settings.openai_model,
             analysis=llm_result,
         )
+
+    async def analyze_policy_for_frontend(
+        self, payload: FrontendPolicyAnalysisRequest
+    ) -> FrontendPolicyAnalysisResponse:
+        datasets = payload.selected_datasets or await self._suggest_frontend_datasets(
+            payload.query
+        )
+        composed_policy_text = self._compose_frontend_policy_text(payload, datasets)
+        policy = await self.analyze_policy(composed_policy_text)
+        intervention_analysis = await self.get_policy_intervention_analysis(policy.policy_id)
+        enhancement_analysis = await self.get_policy_enhancement_analysis(policy.policy_id)
+        return self._build_frontend_analysis_response(
+            query=payload.query,
+            horizon=payload.horizon,
+            datasets=datasets,
+            policy=policy,
+            intervention_analysis=intervention_analysis,
+            enhancement_analysis=enhancement_analysis,
+        )
+
+    async def search_frontend_datasets(
+        self, query: str, rows: int
+    ) -> FrontendDatasetSearchResponse:
+        results = await self._search_data_gov_hk(query, rows)
+        return FrontendDatasetSearchResponse(results=results)
+
+    async def chat_with_frontend_context(
+        self, payload: FrontendChatRequest
+    ) -> FrontendChatResponse:
+        if not self.settings.openai_api_key:
+            raise HTTPException(
+                status_code=503,
+                detail="OPENAI_API_KEY is not configured for policy chat.",
+            )
+
+        dataset_lines = "\n".join(
+            f"- {item.get('title', 'Untitled source')} — {item.get('url', '')}"
+            for item in payload.context.datasets
+        )
+        context_block = (
+            f"Current step: {payload.context.step}\n"
+            f"Policy under analysis: {payload.context.query or '(not yet entered)'}\n"
+            f"Horizon: {payload.context.horizon or 'n/a'}\n"
+            f"Datasets:\n{dataset_lines or '- none selected'}\n\n"
+            f"Latest analysis summary:\n{payload.context.analysis_summary or '(no analysis yet)'}"
+        )
+
+        try:
+            response = await self.client.responses.create(
+                model=self.settings.openai_model,
+                input=[
+                    {
+                        "role": "system",
+                        "content": [
+                            {
+                                "type": "input_text",
+                                "text": FRONTEND_CHAT_SYSTEM_PROMPT,
+                            }
+                        ],
+                    },
+                    {
+                        "role": "system",
+                        "content": [{"type": "input_text", "text": context_block}],
+                    },
+                    *[
+                        {
+                            "role": message.role,
+                            "content": [
+                                {"type": "input_text", "text": message.content}
+                            ],
+                        }
+                        for message in payload.messages
+                    ],
+                ],
+            )
+        except OpenAIError as exc:
+            raise HTTPException(
+                status_code=502,
+                detail="The policy assistant could not generate a reply.",
+            ) from exc
+
+        reply = getattr(response, "output_text", "").strip()
+        if not reply:
+            raise HTTPException(
+                status_code=502,
+                detail="The policy assistant returned an empty reply.",
+            )
+        return FrontendChatResponse(reply=reply)
 
     async def add_note(
         self, policy_id: int, payload: PolicyNoteCreateRequest
@@ -179,6 +295,551 @@ class PolicyAnalysisService:
             summary=summary,
             suggestions=suggestions,
         )
+
+    def _compose_frontend_policy_text(
+        self,
+        payload: FrontendPolicyAnalysisRequest,
+        datasets: list[FrontendDataset],
+    ) -> str:
+        sections = [f"Policy query: {payload.query.strip()}"]
+        if payload.horizon:
+            sections.append(f"Horizon emphasis: {payload.horizon}")
+        if payload.draft_text:
+            sections.append(
+                "Draft policy text:\n"
+                + payload.draft_text.strip()[:10000]
+            )
+        if payload.extra_stakeholders:
+            sections.append(
+                "Extra stakeholders to include:\n"
+                + "\n".join(
+                    f"- {item.label} ({item.level}): {item.note or 'No additional note.'}"
+                    for item in payload.extra_stakeholders
+                )
+            )
+        if datasets:
+            sections.append(
+                "Context datasets from data.gov.hk:\n"
+                + "\n".join(
+                    f"- {item.title} ({item.organization}) [{item.query}]"
+                    for item in datasets[:8]
+                )
+            )
+        return "\n\n".join(sections)
+
+    async def _suggest_frontend_datasets(
+        self, query: str
+    ) -> list[FrontendDataset]:
+        collected: list[FrontendDataset] = []
+        seen: set[str] = set()
+        for suggestion in self._build_dataset_queries(query):
+            for dataset in await self._search_data_gov_hk(suggestion, 3):
+                if dataset.id in seen:
+                    continue
+                seen.add(dataset.id)
+                collected.append(dataset)
+                if len(collected) >= 8:
+                    return collected
+        return collected
+
+    def _build_dataset_queries(self, query: str) -> list[str]:
+        lowered = query.lower()
+        queries = ["housing", "public housing", "rental"]
+        if any(term in lowered for term in ("tenant", "rent", "landlord")):
+            queries.extend(["rent index", "tenancy", "household income"])
+        if any(term in lowered for term in ("approval", "permit", "construction", "contractor")):
+            queries.extend(["construction", "housing supply", "land supply"])
+        if any(term in lowered for term in ("transport", "utility", "district")):
+            queries.extend(["transport", "district population"])
+        unique: list[str] = []
+        seen: set[str] = set()
+        for item in queries:
+            if item in seen:
+                continue
+            seen.add(item)
+            unique.append(item)
+        return unique[:6]
+
+    async def _search_data_gov_hk(
+        self, query: str, rows: int
+    ) -> list[FrontendDataset]:
+        url = (
+            "https://data.gov.hk/en-data/api/3/action/package_search"
+            f"?q={quote(query)}&rows={rows}"
+        )
+
+        def fetch_sync() -> list[FrontendDataset]:
+            request = Request(url, headers={"Accept": "application/json"})
+            with urlopen(request, timeout=20) as response:
+                body = json.loads(response.read().decode("utf-8"))
+            results = body.get("result", {}).get("results", [])
+            datasets: list[FrontendDataset] = []
+            for result in results[:rows]:
+                dataset_id = result.get("id") or result.get("name") or self._slugify(
+                    result.get("title", "dataset")
+                )
+                dataset_name = result.get("name") or result.get("id") or dataset_id
+                datasets.append(
+                    FrontendDataset(
+                        id=str(dataset_id),
+                        title=result.get("title") or dataset_name,
+                        organization=(
+                            (result.get("organization") or {}).get("title")
+                            or "data.gov.hk"
+                        ),
+                        notes=(result.get("notes") or "")[:400],
+                        url=f"https://data.gov.hk/en-data/dataset/{dataset_name}",
+                        query=query,
+                    )
+                )
+            return datasets
+
+        try:
+            return await asyncio.to_thread(fetch_sync)
+        except Exception:
+            return []
+
+    def _build_frontend_analysis_response(
+        self,
+        query: str,
+        horizon: str | None,
+        datasets: list[FrontendDataset],
+        policy: PolicyAnalysisResponse,
+        intervention_analysis: PolicyInterventionAnalysisResponse,
+        enhancement_analysis: PolicyEnhancementAnalysisResponse,
+    ) -> FrontendPolicyAnalysisResponse:
+        stakeholders = self._build_frontend_stakeholders(
+            policy.stakeholders, policy.nodes, policy.feedback_loops
+        )
+        loops = self._build_frontend_loops(policy)
+        impact_short, impact_long = self._estimate_frontend_impacts(
+            query=query,
+            horizon=horizon,
+            policy=policy,
+            intervention_analysis=intervention_analysis,
+        )
+        warnings = self._build_frontend_warnings(
+            policy=policy,
+            intervention_analysis=intervention_analysis,
+        )
+        bundle = self._build_frontend_bundle(
+            intervention_analysis=intervention_analysis,
+            enhancement_analysis=enhancement_analysis,
+        )
+        label = self._derive_policy_label(query)
+        summary = self._derive_policy_summary(query, policy)
+        return FrontendPolicyAnalysisResponse(
+            interpretation=self._build_frontend_interpretation(policy, intervention_analysis),
+            policy=FrontendPolicySummary(label=label, summary=summary),
+            stakeholders=stakeholders,
+            loops=loops,
+            impactShort=impact_short,
+            impactLong=impact_long,
+            warnings=warnings,
+            bundle=bundle,
+            bundleRationale=intervention_analysis.summary,
+            sources=[
+                {"label": dataset.title, "url": dataset.url}
+                for dataset in datasets[:10]
+            ],
+            datasetUsage=self._build_dataset_usage(datasets),
+            datasets=datasets,
+        )
+
+    def _build_frontend_interpretation(
+        self,
+        policy: PolicyAnalysisResponse,
+        intervention_analysis: PolicyInterventionAnalysisResponse,
+    ) -> str:
+        top = intervention_analysis.recommendations[0].title if intervention_analysis.recommendations else "targeted intervention review"
+        return (
+            f"This analysis maps the policy as a housing system, highlights the main actor pressures, "
+            f"and points to {top.lower()} as the first leverage area."
+        )
+
+    def _derive_policy_label(self, query: str) -> str:
+        cleaned = re.sub(r"\s+", " ", query.strip())
+        words = cleaned.split()
+        label = " ".join(words[:8]).strip()
+        label = label.rstrip(".,;:")
+        if not label:
+            return "Housing policy analysis"
+        return label[:1].upper() + label[1:]
+
+    def _derive_policy_summary(
+        self, query: str, policy: PolicyAnalysisResponse
+    ) -> str:
+        excerpt = re.sub(r"\s+", " ", query.strip())
+        if len(excerpt) > 180:
+            excerpt = excerpt[:177].rstrip() + "..."
+        return (
+            f"{excerpt} This is interpreted inside the system boundary: "
+            f"{self._clean_phrase(policy.system_boundary.system_purpose).lower()}."
+        )
+
+    def _build_frontend_stakeholders(
+        self,
+        stakeholders: list[PolicyStakeholderAnalysis],
+        nodes: list[PolicySystemNode],
+        loops: list[PolicyFeedbackLoop],
+    ) -> list[FrontendStakeholder]:
+        exposure_by_stakeholder: dict[int, int] = defaultdict(int)
+        for node in nodes:
+            for stakeholder_id in node.related_stakeholder_ids:
+                exposure_by_stakeholder[stakeholder_id] += 1
+        for loop in loops:
+            for stakeholder_id in loop.affected_stakeholder_ids:
+                exposure_by_stakeholder[stakeholder_id] += 2
+
+        results: list[FrontendStakeholder] = []
+        for index, stakeholder in enumerate(stakeholders):
+            stakeholder_id = stakeholder.stakeholder_id or stakeholder.analysis_id or index + 1
+            group = self._infer_frontend_group(stakeholder)
+            level = self._infer_frontend_level(stakeholder)
+            impact = self._infer_frontend_impact(stakeholder, exposure_by_stakeholder.get(stakeholder_id, 0))
+            results.append(
+                FrontendStakeholder(
+                    id=stakeholder.stakeholder_key
+                    or f"stakeholder-{stakeholder_id}",
+                    label=stakeholder.stakeholder_name,
+                    short=self._build_short_label(stakeholder.stakeholder_name),
+                    group=group,
+                    level=level,
+                    impact=impact,
+                    note=stakeholder.stakeholder_summary,
+                    analysis=self._build_frontend_analysis_rows(stakeholder),
+                )
+            )
+        return results
+
+    def _build_frontend_analysis_rows(
+        self, stakeholder: PolicyStakeholderAnalysis
+    ) -> list[FrontendAnalysisRow]:
+        return [
+            FrontendAnalysisRow(
+                key="mainMotivation",
+                label="Main Motivation",
+                value=stakeholder.micro_level.main_motivation,
+            ),
+            FrontendAnalysisRow(
+                key="goals",
+                label="Goals",
+                value=stakeholder.micro_level.goals,
+            ),
+            FrontendAnalysisRow(
+                key="orgStructure",
+                label="Organisational Structure / Shareholders",
+                value=stakeholder.micro_level.organizational_structure_shareholders,
+            ),
+            FrontendAnalysisRow(
+                key="culture",
+                label="Corporate Culture / Communication",
+                value=stakeholder.micro_level.corporate_culture_communication_processes,
+            ),
+            FrontendAnalysisRow(
+                key="requiredResources",
+                label="Required Resources / Dependencies",
+                value=stakeholder.meso_level.required_resources_dependencies,
+            ),
+            FrontendAnalysisRow(
+                key="availableResources",
+                label="Available Resources",
+                value=stakeholder.meso_level.available_resources,
+            ),
+            FrontendAnalysisRow(
+                key="involvedParties",
+                label="Stakeholders",
+                value=stakeholder.meso_level.stakeholders,
+            ),
+            FrontendAnalysisRow(
+                key="cooperationPartners",
+                label="Cooperation Partners",
+                value=stakeholder.meso_level.cooperation_partners,
+            ),
+            FrontendAnalysisRow(
+                key="competitors",
+                label="Competitors / Antagonists",
+                value=stakeholder.meso_level.competitors_antagonists,
+            ),
+            FrontendAnalysisRow(
+                key="legislators",
+                label="Legislators",
+                value=stakeholder.macro_level.legislators_national_international,
+            ),
+            FrontendAnalysisRow(
+                key="economicPolicy",
+                label="Economic Policy / Regulation",
+                value=stakeholder.macro_level.economic_policy_regulation,
+            ),
+            FrontendAnalysisRow(
+                key="globalMarkets",
+                label="Global Markets & Trends",
+                value=stakeholder.macro_level.global_markets_trends,
+            ),
+            FrontendAnalysisRow(
+                key="societyNgos",
+                label="Society / Public / NGOs",
+                value=stakeholder.macro_level.society_public_ngos,
+            ),
+            FrontendAnalysisRow(
+                key="media",
+                label="Media / Social Media",
+                value=stakeholder.macro_level.media_social_media,
+            ),
+            FrontendAnalysisRow(
+                key="technology",
+                label="Technological Developments",
+                value=stakeholder.macro_level.technological_developments,
+            ),
+            FrontendAnalysisRow(
+                key="environment",
+                label="Environment / Climate Change",
+                value=stakeholder.macro_level.environment_climate_change,
+            ),
+            FrontendAnalysisRow(
+                key="culturalNorms",
+                label="Cultural Norms & Values",
+                value=stakeholder.macro_level.cultural_norms_values,
+            ),
+        ]
+
+    def _build_frontend_loops(
+        self, policy: PolicyAnalysisResponse
+    ) -> list[FrontendLoop]:
+        node_map = {
+            node.policy_node_id: node.label
+            for node in policy.nodes
+            if node.policy_node_id is not None
+        }
+        connection_map = {
+            connection.connection_id: connection
+            for connection in policy.connections
+            if connection.connection_id is not None
+        }
+        loops: list[FrontendLoop] = []
+        for loop in policy.feedback_loops:
+            chain = []
+            for node_id in loop.involved_node_ids[:4]:
+                label = node_map.get(node_id)
+                if not label:
+                    continue
+                effect = "adds pressure"
+                for connection_id in loop.involved_connection_ids:
+                    connection = connection_map.get(connection_id)
+                    if not connection:
+                        continue
+                    if connection.source_node_id == node_id or connection.target_node_id == node_id:
+                        effect = self._clean_phrase(connection.relationship_type or connection.explanation)
+                        break
+                chain.append(FrontendLoopChainStep(node=label, effect=effect))
+            if not chain:
+                continue
+            loops.append(
+                FrontendLoop(
+                    id=loop.loop_key or f"loop-{loop.feedback_loop_id}",
+                    title=loop.loop_name,
+                    type="R" if loop.loop_type == "reinforcing" else "B",
+                    chain=chain,
+                    summary=loop.explanation,
+                    evidence=[
+                        point for point in loop.possible_intervention_points[:3] if point
+                    ],
+                )
+            )
+
+        if loops:
+            return loops[:4]
+
+        fallback_nodes = [
+            node.label for node in policy.nodes[:4]
+        ]
+        if len(fallback_nodes) >= 3:
+            return [
+                FrontendLoop(
+                    id="derived-delivery-loop",
+                    title="Delivery coordination loop",
+                    type="B",
+                    chain=[
+                        FrontendLoopChainStep(node=fallback_nodes[0], effect="sets policy pressure"),
+                        FrontendLoopChainStep(node=fallback_nodes[1], effect="shapes delivery capacity"),
+                        FrontendLoopChainStep(node=fallback_nodes[2], effect="feeds back into outcomes"),
+                    ],
+                    summary=(
+                        "No explicit feedback loop was saved, so this derived loop shows the main "
+                        "delivery path between policy pressure, execution capacity, and public outcome."
+                    ),
+                    evidence=[],
+                )
+            ]
+        return []
+
+    def _estimate_frontend_impacts(
+        self,
+        query: str,
+        horizon: str | None,
+        policy: PolicyAnalysisResponse,
+        intervention_analysis: PolicyInterventionAnalysisResponse,
+    ) -> tuple[FrontendImpact, FrontendImpact]:
+        lowered = query.lower()
+        short = {
+            "affordability": 1.0,
+            "supply": 0.0,
+            "publicBudget": 0.0,
+            "developerIncentives": 0.0,
+            "tenantProtection": 0.0,
+            "constructionSpeed": 0.0,
+            "transportPressure": 0.0,
+            "inequality": 0.0,
+            "publicSatisfaction": 0.0,
+        }
+
+        def bump(key: str, amount: float):
+            short[key] = max(-10.0, min(10.0, short[key] + amount))
+
+        if "affordable" in lowered or "housing" in lowered:
+            bump("affordability", 3.0)
+            bump("publicSatisfaction", 2.0)
+        if any(term in lowered for term in ("approval", "fast-track", "accelerat", "milestone")):
+            bump("constructionSpeed", 4.0)
+            bump("supply", 3.0)
+            bump("developerIncentives", 2.0)
+        if any(term in lowered for term in ("tenant", "subsid", "support", "protect")):
+            bump("tenantProtection", 4.0)
+            bump("inequality", -2.0)
+            bump("publicBudget", -2.0)
+        if any(term in lowered for term in ("transport", "utility", "infrastructure")):
+            bump("transportPressure", 3.0)
+            bump("publicBudget", -2.0)
+        if any(term in lowered for term in ("tax", "levy")):
+            bump("publicBudget", 2.0)
+            bump("developerIncentives", -1.0)
+
+        recommendation_count = len(intervention_analysis.recommendations)
+        loop_count = len(policy.feedback_loops)
+        bump("publicSatisfaction", min(recommendation_count, 3))
+        bump("supply", min(loop_count, 2))
+
+        long = dict(short)
+        long["affordability"] = max(-10.0, min(10.0, long["affordability"] + 1.5))
+        long["supply"] = max(-10.0, min(10.0, long["supply"] + 2.0))
+        long["constructionSpeed"] = max(-10.0, min(10.0, long["constructionSpeed"] - 1.0))
+        long["transportPressure"] = max(-10.0, min(10.0, long["transportPressure"] + 1.5))
+        long["publicBudget"] = max(-10.0, min(10.0, long["publicBudget"] - 1.0))
+        if horizon == "long":
+            long["publicSatisfaction"] = max(-10.0, min(10.0, long["publicSatisfaction"] + 1.0))
+
+        return (
+            FrontendImpact(**{key: round(value, 1) for key, value in short.items()}),
+            FrontendImpact(**{key: round(value, 1) for key, value in long.items()}),
+        )
+
+    def _build_frontend_warnings(
+        self,
+        policy: PolicyAnalysisResponse,
+        intervention_analysis: PolicyInterventionAnalysisResponse,
+    ) -> list[FrontendWarning]:
+        warnings: list[FrontendWarning] = []
+        for recommendation in intervention_analysis.recommendations[:3]:
+            detail = recommendation.tradeoffs[0] if recommendation.tradeoffs else recommendation.reason
+            warnings.append(
+                FrontendWarning(
+                    severity="high" if recommendation.confidence >= 0.8 else "medium",
+                    title=recommendation.title,
+                    detail=detail,
+                )
+            )
+        if not warnings:
+            warnings.append(
+                FrontendWarning(
+                    severity="medium",
+                    title="Policy execution risk",
+                    detail=policy.system_boundary.explanation,
+                )
+            )
+        if len(warnings) == 1:
+            warnings.append(
+                FrontendWarning(
+                    severity="low",
+                    title="Stakeholder coordination risk",
+                    detail=(
+                        "The current map should still be checked against cross-agency delivery dependencies "
+                        "before implementation."
+                    ),
+                )
+            )
+        return warnings[:5]
+
+    def _build_frontend_bundle(
+        self,
+        intervention_analysis: PolicyInterventionAnalysisResponse,
+        enhancement_analysis: PolicyEnhancementAnalysisResponse,
+    ) -> list[FrontendBundleItem]:
+        items: list[FrontendBundleItem] = []
+        for recommendation in intervention_analysis.recommendations[:3]:
+            items.append(
+                FrontendBundleItem(
+                    label=recommendation.title,
+                    short=recommendation.intervention_key[:24],
+                    description=recommendation.recommended_action,
+                    rationale=recommendation.reason,
+                )
+            )
+        for suggestion in enhancement_analysis.suggestions[:1]:
+            items.append(
+                FrontendBundleItem(
+                    label=suggestion.title,
+                    short=suggestion.enhancement_key[:24],
+                    description=suggestion.what_to_add,
+                    rationale=suggestion.reason,
+                )
+            )
+        return items[:4]
+
+    def _build_dataset_usage(self, datasets: list[FrontendDataset]) -> str:
+        if not datasets:
+            return "No data.gov.hk datasets were selected for this run."
+        titles = ", ".join(dataset.title for dataset in datasets[:3])
+        return (
+            f"This analysis is grounded in current data.gov.hk context, including {titles}. "
+            f"The selected datasets are used to frame stakeholder pressure, likely loops, and implementation risk."
+        )
+
+    def _infer_frontend_group(self, stakeholder: PolicyStakeholderAnalysis) -> str:
+        text = f"{stakeholder.stakeholder_name} {stakeholder.stakeholder_type}".lower()
+        if any(term in text for term in ("government", "bureau", "department", "authority", "regulator", "public")):
+            return "government"
+        if any(term in text for term in ("developer", "contractor", "market", "investor", "landlord", "private")):
+            return "market"
+        return "people"
+
+    def _infer_frontend_level(self, stakeholder: PolicyStakeholderAnalysis) -> str:
+        text = f"{stakeholder.stakeholder_type} {stakeholder.stakeholder_summary}".lower()
+        if any(term in text for term in ("society", "media", "ngo", "public", "international", "global")):
+            return "macro"
+        if any(term in text for term in ("authority", "regulator", "developer", "contractor", "service")):
+            return "meso"
+        return "micro"
+
+    def _infer_frontend_impact(
+        self, stakeholder: PolicyStakeholderAnalysis, exposure_score: int
+    ) -> float:
+        text = f"{stakeholder.stakeholder_type} {stakeholder.stakeholder_summary}".lower()
+        base = min(0.25 + exposure_score * 0.12, 0.9)
+        if any(term in text for term in ("beneficiar", "tenant", "household", "community")):
+            signed = base
+        elif any(term in text for term in ("contractor", "developer", "landlord", "investor")):
+            signed = -base
+        else:
+            signed = 0.12 + min(exposure_score * 0.08, 0.5)
+        return round(max(-1.0, min(1.0, signed)), 2)
+
+    def _build_short_label(self, value: str) -> str:
+        words = [word for word in re.split(r"\s+", value.strip()) if word]
+        if not words:
+            return "N/A"
+        if len(words) == 1:
+            return words[0][:4].upper()
+        return "".join(word[0] for word in words[:3]).upper()
 
     async def _generate_system_map(
         self, policy_text: str

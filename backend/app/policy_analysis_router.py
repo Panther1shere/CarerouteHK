@@ -6,6 +6,12 @@ from app.database import get_session
 from app.policy_analysis_repository import PolicyAnalysisRepository
 from app.policy_analysis_service import PolicyAnalysisService
 from app.schemas import (
+    FrontendChatRequest,
+    FrontendChatResponse,
+    FrontendDatasetSearchRequest,
+    FrontendDatasetSearchResponse,
+    FrontendPolicyAnalysisRequest,
+    FrontendPolicyAnalysisResponse,
     PolicyAnalysisOnlyResponse,
     PolicyAnalysisRequest,
     PolicyAnalysisResponse,
@@ -40,6 +46,41 @@ async def create_policy_analysis(
     service: PolicyAnalysisService = Depends(get_policy_analysis_service),
 ) -> PolicyAnalysisResponse:
     return await service.analyze_policy(payload.text)
+
+
+@router.post(
+    "/api/frontend/policygraph/analyze",
+    response_model=FrontendPolicyAnalysisResponse,
+)
+async def create_frontend_policy_analysis(
+    payload: FrontendPolicyAnalysisRequest,
+    service: PolicyAnalysisService = Depends(get_policy_analysis_service),
+) -> FrontendPolicyAnalysisResponse:
+    return await service.analyze_policy_for_frontend(payload)
+
+
+@router.post(
+    "/api/frontend/policygraph/datasets/search",
+    response_model=FrontendDatasetSearchResponse,
+)
+async def search_frontend_policy_datasets(
+    payload: FrontendDatasetSearchRequest,
+    service: PolicyAnalysisService = Depends(get_policy_analysis_service),
+) -> FrontendDatasetSearchResponse:
+    return await service.search_frontend_datasets(
+        query=payload.query, rows=payload.rows
+    )
+
+
+@router.post(
+    "/api/frontend/policygraph/chat",
+    response_model=FrontendChatResponse,
+)
+async def chat_with_frontend_policy_context(
+    payload: FrontendChatRequest,
+    service: PolicyAnalysisService = Depends(get_policy_analysis_service),
+) -> FrontendChatResponse:
+    return await service.chat_with_frontend_context(payload)
 
 
 @router.get("/policy", response_model=list[PolicySummaryResponse])

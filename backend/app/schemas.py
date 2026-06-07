@@ -435,3 +435,134 @@ class PolicyAnalysisLLMEnvelope(BaseModel):
     connections: list[PolicySystemMapConnectionInput] = Field(default_factory=list)
     feedback_loops: list[PolicySystemMapFeedbackLoopInput] = Field(default_factory=list)
     system_boundary: PolicySystemBoundaryInput
+
+
+class FrontendDataset(BaseModel):
+    id: str
+    title: str
+    organization: str
+    notes: str
+    url: str
+    query: str
+
+
+class FrontendPolicyExtraStakeholder(BaseModel):
+    label: str
+    level: str = Field(pattern="^(micro|meso|macro)$")
+    note: str | None = None
+
+
+class FrontendPolicyAnalysisRequest(BaseModel):
+    query: str = Field(min_length=2, max_length=2000)
+    horizon: str | None = Field(default=None, pattern="^(short|long)$")
+    draft_text: str | None = Field(default=None, max_length=50000)
+    extra_stakeholders: list[FrontendPolicyExtraStakeholder] = Field(default_factory=list)
+    selected_datasets: list[FrontendDataset] = Field(default_factory=list)
+
+
+class FrontendAnalysisRow(BaseModel):
+    key: str
+    label: str
+    value: str
+    source: str | None = None
+
+
+class FrontendStakeholder(BaseModel):
+    id: str
+    label: str
+    short: str
+    group: str = Field(pattern="^(people|market|government)$")
+    level: str = Field(pattern="^(micro|meso|macro)$")
+    impact: float = Field(ge=-1, le=1)
+    note: str
+    analysis: list[FrontendAnalysisRow]
+
+
+class FrontendLoopChainStep(BaseModel):
+    node: str
+    effect: str
+
+
+class FrontendLoop(BaseModel):
+    id: str
+    title: str
+    type: str = Field(pattern="^(R|B)$")
+    chain: list[FrontendLoopChainStep]
+    summary: str
+    evidence: list[str] = Field(default_factory=list)
+
+
+class FrontendWarning(BaseModel):
+    severity: str = Field(pattern="^(low|medium|high)$")
+    title: str
+    detail: str
+
+
+class FrontendImpact(BaseModel):
+    affordability: float
+    supply: float
+    publicBudget: float
+    developerIncentives: float
+    tenantProtection: float
+    constructionSpeed: float
+    transportPressure: float
+    inequality: float
+    publicSatisfaction: float
+
+
+class FrontendBundleItem(BaseModel):
+    label: str
+    short: str
+    description: str | None = None
+    rationale: str | None = None
+
+
+class FrontendPolicySummary(BaseModel):
+    label: str
+    summary: str
+
+
+class FrontendPolicyAnalysisResponse(BaseModel):
+    interpretation: str
+    policy: FrontendPolicySummary
+    stakeholders: list[FrontendStakeholder]
+    loops: list[FrontendLoop]
+    impactShort: FrontendImpact
+    impactLong: FrontendImpact
+    warnings: list[FrontendWarning]
+    bundle: list[FrontendBundleItem]
+    bundleRationale: str
+    sources: list[dict[str, str]]
+    datasetUsage: str
+    datasets: list[FrontendDataset]
+
+
+class FrontendDatasetSearchRequest(BaseModel):
+    query: str = Field(min_length=1, max_length=100)
+    rows: int = Field(default=6, ge=1, le=10)
+
+
+class FrontendDatasetSearchResponse(BaseModel):
+    results: list[FrontendDataset]
+
+
+class FrontendChatMessage(BaseModel):
+    role: str = Field(pattern="^(user|assistant)$")
+    content: str = Field(min_length=1, max_length=8000)
+
+
+class FrontendChatContext(BaseModel):
+    step: int = Field(ge=1, le=5)
+    query: str = Field(max_length=2000)
+    horizon: str | None = Field(default=None, pattern="^(short|long)$")
+    analysis_summary: str | None = Field(default=None, max_length=20000)
+    datasets: list[dict[str, str]] = Field(default_factory=list, max_length=20)
+
+
+class FrontendChatRequest(BaseModel):
+    messages: list[FrontendChatMessage] = Field(min_length=1, max_length=40)
+    context: FrontendChatContext
+
+
+class FrontendChatResponse(BaseModel):
+    reply: str

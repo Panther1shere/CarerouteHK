@@ -89,6 +89,25 @@ docker compose down -v
 4. Review stakeholders, intervention reasoning, and policy enhancements.
 5. Reopen saved analyses from the right-hand panel.
 
+## Frontend-Driven Integration
+
+This repo now follows a frontend-driven integration model for the policy wizard.
+
+1. Map the frontend contract first.
+   The active UI contract is defined by `new-frontend/src/lib/policygraph/analyze.functions.ts` and the wizard components that consume the `PolicyAnalysis` payload.
+
+2. Shape backend responses to that contract.
+   The backend exposes adapter endpoints that return the exact JSON structure the frontend already expects:
+   - `POST /api/frontend/policygraph/analyze`
+   - `POST /api/frontend/policygraph/datasets/search`
+   - `POST /api/frontend/policygraph/chat`
+
+3. Keep formatting logic in the backend.
+   The backend now handles dataset suggestion, policy persistence, stakeholder mapping, loop formatting, impact estimation, warning generation, bundle generation, and grounded chat responses so the frontend can render with minimal transformation.
+
+4. Limit frontend changes to transport only.
+   The wizard steps still call the same exported server functions. Those functions now proxy to the backend adapter routes instead of running the analysis pipeline locally.
+
 ## Notes
 
 - The frontend service is now sourced from `new-frontend/`; the old Angular frontend has been retired.
