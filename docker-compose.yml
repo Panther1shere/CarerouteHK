@@ -41,19 +41,25 @@ services:
   frontend:
     build:
       context: .
-      dockerfile: frontend/Dockerfile
+      dockerfile: new-frontend/Dockerfile
     restart: unless-stopped
     env_file:
       - .env
     environment:
       BACKEND_URL: ${BACKEND_URL}
+      OPENAI_API_KEY: ${OPENAI_API_KEY}
+      NODE_ENV: development
     depends_on:
       backend:
         condition: service_healthy
     ports:
-      - "${FRONTEND_PORT}:80"
+      - "${FRONTEND_PORT}:8080"
     healthcheck:
-      test: ["CMD-SHELL", "wget -q -O /dev/null http://127.0.0.1/ || exit 1"]
+      test:
+        [
+          "CMD-SHELL",
+          "node -e \"fetch('http://127.0.0.1:8080').then((res) => process.exit(res.ok ? 0 : 1)).catch(() => process.exit(1))\"",
+        ]
       interval: 10s
       timeout: 5s
       retries: 10

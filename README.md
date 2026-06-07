@@ -4,26 +4,25 @@ Housing Policy Loop Navigator is a hackathon-ready B2G demo for city housing tea
 
 The stack is:
 
-- Angular frontend for the analyst dashboard
-- FastAPI backend for seeded scenario loading, simulation, and intervention ranking
-- PostgreSQL for the seeded city model and simulation runs
+- TanStack Start / React frontend for the policy workbench
+- FastAPI backend for policy analysis, intervention guidance, and drafting support
+- PostgreSQL for saved policy analyses and system maps
 
 ## What the demo does
 
-- Loads a seeded city called `Harborview`
-- Visualizes a causal housing-policy graph with stakeholder, factor, and policy nodes
-- Highlights reinforcing loops that make policy fail
-- Simulates housing policy changes with deterministic scoring
-- Ranks intervention options with explainable tradeoffs
-- Shows a light neighborhood map for contextual impact
+- Accepts housing policy text and saves a full backend analysis
+- Generates stakeholders with Micro, Meso, and Macro analysis
+- Stores nodes, connections, feedback loops, system boundary, and notes
+- Returns intervention analysis with explicit reasoning and tradeoffs
+- Returns policy-enhancement guidance for what to add back into the policy text
 
 ## API surface
 
-- `GET /api/scenarios/default`
-- `GET /api/graph`
-- `GET /api/neighborhoods`
-- `POST /api/simulate-policy`
-- `POST /api/recommend-interventions`
+- `POST /policy`
+- `GET /policy`
+- `GET /policy/{policyId}`
+- `GET /policy/{policyId}/interventions/analysis`
+- `GET /policy/{policyId}/policy-enhancements`
 - `GET /healthz`
 
 ## Project structure
@@ -42,23 +41,17 @@ The stack is:
 │   │   └── simulation.py
 │   ├── Dockerfile
 │   └── requirements.txt
-├── frontend
-│   ├── nginx
-│   │   └── default.conf.template
+├── new-frontend
 │   ├── src
-│   │   ├── app
-│   │   │   ├── app.css
-│   │   │   ├── app.html
-│   │   │   ├── app.spec.ts
-│   │   │   ├── app.ts
-│   │   │   ├── policy-navigator.service.ts
-│   │   │   └── policy-navigator.types.ts
-│   │   ├── index.html
-│   │   ├── main.ts
+│   │   ├── lib
+│   │   │   └── backend-policy.functions.ts
+│   │   ├── routes
+│   │   │   ├── __root.tsx
+│   │   │   └── index.tsx
 │   │   └── styles.css
 │   ├── Dockerfile
-│   ├── angular.json
-│   └── package.json
+│   ├── package.json
+│   └── vite.config.ts
 ├── understand.md
 ├── .env
 ├── .env.example
@@ -75,7 +68,7 @@ docker compose up --build
 Open:
 
 - Frontend: [http://localhost:4200](http://localhost:4200)
-- API docs: [http://localhost:8000/docs](http://localhost:8000/docs)
+- API docs: [http://localhost:8000/swagger-ui/index.html](http://localhost:8000/swagger-ui/index.html)
 - Health check: [http://localhost:8000/healthz](http://localhost:8000/healthz)
 
 ## Useful commands
@@ -90,14 +83,14 @@ docker compose down -v
 
 ## Demo flow
 
-1. Open the dashboard.
-2. Pick a housing policy and priority.
-3. Run the simulation.
-4. Inspect which loops stay dangerous.
-5. Review the suggested interventions and tradeoffs.
+1. Open the workbench.
+2. Paste a housing policy.
+3. Run the backend analysis.
+4. Review stakeholders, intervention reasoning, and policy enhancements.
+5. Reopen saved analyses from the right-hand panel.
 
 ## Notes
 
-- The simulation is deterministic and explainable by design.
-- The advisor layer is grounded on structured policy logic so the demo still works even if generative AI is unavailable.
+- The frontend service is now sourced from `new-frontend/`; the old Angular frontend has been retired.
+- The intervention and enhancement views are backed by persisted backend policy analysis endpoints.
 - `understand.md` contains the product brief, technical concept note, and B2G pitch framing.
