@@ -1,10 +1,7 @@
 import { useState, type ComponentType } from "react";
-import { useMutation } from "@tanstack/react-query";
-import { useServerFn } from "@tanstack/react-start";
 import {
   ArrowLeft,
   ArrowRight,
-  Loader2,
   AlertCircle,
   ChevronDown,
   GitBranch,
@@ -14,31 +11,13 @@ import {
   Users,
 } from "lucide-react";
 import { useWizard } from "./wizard-context";
-import { analyzePolicy, type PolicyAnalysis } from "@/lib/policygraph/analyze.functions";
+import type { PolicyAnalysis } from "@/lib/policygraph/analyze.functions";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 
 export function Step4Bundle() {
   const w = useWizard();
   const a = w.analysis;
-  const fn = useServerFn(analyzePolicy);
   const [openIdx, setOpenIdx] = useState<number | null>(null);
-  const run = useMutation({
-    mutationFn: () => {
-      const interventionNames = (a?.bundle ?? []).map((b) => b.label).join(", ");
-      return fn({
-        data: {
-          query: `${w.query} — with interventions: ${interventionNames}`,
-          horizon: w.horizon,
-          draftText: w.draftText || undefined,
-          selectedDatasets: w.selectedDatasets,
-        },
-      });
-    },
-    onSuccess: (res) => {
-      w.setBundleAnalysis(res);
-      w.setStep(5);
-    },
-  });
 
   if (!a) return null;
 
@@ -202,12 +181,6 @@ export function Step4Bundle() {
           })}
         </div>
 
-        {run.error && (
-          <div className="flex items-start gap-2 rounded-lg border border-coral/40 bg-coral/10 px-3 py-2 text-sm">
-            <AlertCircle className="mt-0.5 h-4 w-4 shrink-0 text-coral" /> {run.error.message}
-          </div>
-        )}
-
         <div className="flex items-center justify-between border-t hairline pt-6">
           <button
             onClick={() => w.setStep(3)}
@@ -216,19 +189,13 @@ export function Step4Bundle() {
             <ArrowLeft className="h-4 w-4" /> Back
           </button>
           <button
-            onClick={() => run.mutate()}
-            disabled={run.isPending}
+            onClick={() => {
+              w.setBundleAnalysis(buildInterventionSimulation(a));
+              w.setStep(5);
+            }}
             className="inline-flex items-center gap-2 rounded-xl bg-primary px-5 py-2.5 text-sm font-semibold text-primary-foreground hover:opacity-90 disabled:opacity-60"
           >
-            {run.isPending ? (
-              <>
-                <Loader2 className="h-4 w-4 animate-spin" /> Simulating…
-              </>
-            ) : (
-              <>
-                Simulate leverage point <ArrowRight className="h-4 w-4" />
-              </>
-            )}
+            Simulate leverage point <ArrowRight className="h-4 w-4" />
           </button>
         </div>
       </div>
@@ -238,6 +205,177 @@ export function Step4Bundle() {
 
 type BundleItem = NonNullable<PolicyAnalysis["bundle"]>[number];
 type IconType = ComponentType<{ className?: string }>;
+type Impact = PolicyAnalysis["impactShort"];
+type ImpactKey = keyof Impact;
+
+const IMPACT_KEYS: ImpactKey[] = [
+  "affordability",
+  "supply",
+  "publicBudget",
+  "developerIncentives",
+  "tenantProtection",
+  "constructionSpeed",
+  "transportPressure",
+  "inequality",
+  "publicSatisfaction",
+];
+
+function buildInterventionSimulation(analysis: PolicyAnalysis): PolicyAnalysis {
+  const shortDelta = buildInterventionDelta(analysis, "short");
+  const longDelta = buildInterventionDelta(analysis, "long");
+  const interventionNames = analysis.bundle.map((item) => item.label).filter(Boolean);
+
+  return {
+    ...analysis,
+    policy: {
+      ...analysis.policy,
+      label: `${analysis.policy.label} + interventions`,
+      summary:
+        "Deterministic intervention comparison built from the saved system map, selected leverage points, feedback loops, and tradeoffs.",
+    },
+    interpretation:
+      "The intervention comparison applies the selected leverage-point changes to the saved base analysis. It does not re-run policy generation, so before/after values stay tied to the same policy graph.",
+    impactShort: applyImpactDelta(analysis.impactShort, shortDelta),
+    impactLong: applyImpactDelta(analysis.impactLong, longDelta),
+    warnings: buildInterventionWarnings(analysis),
+    bundleRationale:
+      interventionNames.length > 0
+        ? `Comparison applies ${interventionNames.slice(0, 3).join(", ")} to the saved base analysis.`
+        : analysis.bundleRationale,
+  };
+}
+
+function buildInterventionDelta(
+  analysis: PolicyAnalysis,
+  horizon: "short" | "long",
+): Record<ImpactKey, number> {
+  const delta = emptyDelta();
+  const graph = analysis.graph;
+  const nodeById = new Map(graph?.nodes.map((node) => [node.policy_node_id, node]) ?? []);
+  const loopById = new Map(graph?.feedbackLoops.map((loop) => [loop.feedback_loop_id, loop]) ?? []);
+  const horizonWeight = horizon === "long" ? 1.28 : 1;
+
+  for (const bundle of analysis.bundle.slice(0, 4)) {
+    const confidence = typeof bundle.confidence === "number" ? bundle.confidence : 0.68;
+    const weight = Math.max(0.45, Math.min(1, confidence)) * horizonWeight;
+    const targetedNodes = (bundle.targetedNodeIds ?? [])
+      .map((id) => nodeById.get(id))
+      .filter(Boolean);
+    const targetedLoops = (bundle.targetedFeedbackLoopIds ?? [])
+      .map((id) => loopById.get(id))
+      .filter(Boolean);
+    const text = [
+      bundle.label,
+      bundle.short,
+      bundle.description,
+      bundle.rationale,
+      bundle.expectedSystemShift,
+      ...(bundle.interventionPoints ?? []),
+      ...targetedNodes.map((node) => `${node?.label} ${node?.description} ${node?.category}`),
+      ...targetedLoops.map((loop) => `${loop?.loop_name} ${loop?.explanation}`),
+    ]
+      .filter(Boolean)
+      .join(" ")
+      .toLowerCase();
+
+    if (matches(text, ["afford", "rent", "price", "cost", "scarcity"])) {
+      delta.affordability += 1.15 * weight;
+      delta.publicSatisfaction += 0.45 * weight;
+    }
+    if (matches(text, ["supply", "vacancy", "idle", "unit", "home", "housing stock", "release"])) {
+      delta.supply += 1.35 * weight;
+      delta.affordability += 0.75 * weight;
+    }
+    if (
+      matches(text, ["permit", "approval", "construction", "delivery", "milestone", "timeline"])
+    ) {
+      delta.constructionSpeed += 1.25 * weight;
+      delta.supply += 0.85 * weight;
+      delta.developerIncentives += 0.45 * weight;
+    }
+    if (matches(text, ["tenant", "household", "displacement", "protection", "low-income"])) {
+      delta.tenantProtection += 1.1 * weight;
+      delta.inequality -= 0.75 * weight;
+      delta.publicSatisfaction += 0.45 * weight;
+    }
+    if (matches(text, ["trust", "transparent", "complian", "data", "declaration", "fair"])) {
+      delta.publicSatisfaction += 1.05 * weight;
+      delta.inequality -= 0.35 * weight;
+    }
+    if (matches(text, ["tax", "levy", "charge", "fee", "penalty", "enforcement"])) {
+      delta.publicBudget += 0.65 * weight;
+      delta.developerIncentives -= 0.55 * weight;
+      delta.publicSatisfaction -= 0.18 * weight;
+    }
+    if (matches(text, ["subsid", "grant", "funding", "voucher", "rebate"])) {
+      delta.publicBudget -= 0.95 * weight;
+      delta.tenantProtection += 0.65 * weight;
+      delta.affordability += 0.55 * weight;
+    }
+    if (matches(text, ["infrastructure", "transport", "utility", "capacity", "service"])) {
+      delta.transportPressure -= 0.9 * weight;
+      delta.publicBudget -= 0.55 * weight;
+      delta.publicSatisfaction += 0.4 * weight;
+    }
+
+    for (const loop of targetedLoops) {
+      if (loop?.loop_type === "reinforcing") {
+        delta.affordability += 0.45 * weight;
+        delta.inequality -= 0.35 * weight;
+        delta.publicSatisfaction += 0.35 * weight;
+      }
+      if (loop?.loop_type === "balancing") {
+        delta.supply += 0.45 * weight;
+        delta.transportPressure -= 0.25 * weight;
+        delta.publicSatisfaction += 0.3 * weight;
+      }
+    }
+  }
+
+  if (analysis.bundle.length > 0) {
+    delta.publicSatisfaction += 0.5 * horizonWeight;
+  }
+
+  return Object.fromEntries(
+    IMPACT_KEYS.map((key) => [key, Number(delta[key].toFixed(1))]),
+  ) as Record<ImpactKey, number>;
+}
+
+function applyImpactDelta(base: Impact, delta: Record<ImpactKey, number>): Impact {
+  return Object.fromEntries(
+    IMPACT_KEYS.map((key) => [key, clampImpact(base[key] + delta[key])]),
+  ) as Impact;
+}
+
+function buildInterventionWarnings(analysis: PolicyAnalysis): PolicyAnalysis["warnings"] {
+  const tradeoffs = analysis.bundle.flatMap((item) => item.tradeoffs ?? []).filter(Boolean);
+  const mapped = tradeoffs.slice(0, 3).map((detail, index) => ({
+    severity: index === 0 ? ("medium" as const) : ("low" as const),
+    title: index === 0 ? "Intervention tradeoff" : "Monitoring requirement",
+    detail,
+  }));
+  if (mapped.length > 0) return mapped;
+  return [
+    {
+      severity: "low",
+      title: "Monitor second-order effects",
+      detail:
+        "The comparison shifts only the mapped intervention dimensions. Analysts should still monitor affected nodes and feedback loops after implementation.",
+    },
+  ];
+}
+
+function emptyDelta(): Record<ImpactKey, number> {
+  return Object.fromEntries(IMPACT_KEYS.map((key) => [key, 0])) as Record<ImpactKey, number>;
+}
+
+function matches(value: string, terms: string[]) {
+  return terms.some((term) => value.includes(term));
+}
+
+function clampImpact(value: number) {
+  return Math.max(-10, Math.min(10, Number(value.toFixed(1))));
+}
 
 function buildBundleMapping(analysis: PolicyAnalysis, bundle: BundleItem) {
   const graph = analysis.graph;

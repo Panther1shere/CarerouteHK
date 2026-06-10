@@ -14,7 +14,7 @@ export type Dimension =
 export const DIMENSIONS: { id: Dimension; label: string; positiveIsGood: boolean }[] = [
   { id: "affordability", label: "Affordability", positiveIsGood: true },
   { id: "supply", label: "Housing Supply", positiveIsGood: true },
-  { id: "publicBudget", label: "Public Budget", positiveIsGood: true },
+  { id: "publicBudget", label: "Fiscal Position", positiveIsGood: true },
   { id: "developerIncentives", label: "Developer Incentives", positiveIsGood: true },
   { id: "tenantProtection", label: "Tenant Protection", positiveIsGood: true },
   { id: "constructionSpeed", label: "Construction Speed", positiveIsGood: true },

@@ -19,12 +19,31 @@ function describeImpact(v: number, positiveIsGood: boolean) {
   return `Extremely ${dir.toLowerCase()}`;
 }
 
+function describeChange(current: number, baseline: number, positiveIsGood: boolean) {
+  const change = current - baseline;
+  const magnitude = Math.abs(change);
+  if (magnitude < 0.1) {
+    return { label: "No material change", improved: null as boolean | null };
+  }
+
+  const improved = positiveIsGood ? change > 0 : change < 0;
+  return {
+    label: `${improved ? "Improved" : "Worsened"} ${change > 0 ? "+" : ""}${change.toFixed(1)}`,
+    improved,
+  };
+}
+
 export function ImpactChart({ impact, compareImpact }: Props) {
   const rows = DIMENSIONS.map((d) => {
     const v = impact[d.id] ?? 0;
     const cmp = compareImpact?.[d.id];
     return { d, v, cmp };
-  }).sort((a, b) => b.v - a.v);
+  }).sort((a, b) => {
+    if (compareImpact) {
+      return Math.abs((b.v ?? 0) - (b.cmp ?? 0)) - Math.abs((a.v ?? 0) - (a.cmp ?? 0));
+    }
+    return Math.abs(b.v) - Math.abs(a.v);
+  });
 
   return (
     <div className="space-y-3">
@@ -34,10 +53,18 @@ export function ImpactChart({ impact, compareImpact }: Props) {
         const width = (magnitude / 10) * 50; // half-width %
         const cmpWidth = cmp !== undefined ? (Math.abs(cmp) / 10) * 50 : 0;
         const isZero = magnitude < 0.05;
+        const change = cmp !== undefined ? describeChange(v, cmp, d.positiveIsGood) : null;
+        const barIsBeneficial = change?.improved ?? beneficial;
+        const directionHint = d.positiveIsGood ? "Higher is better" : "Lower is better";
 
         return (
-          <div key={d.id} className="grid grid-cols-[160px_1fr_140px] items-center gap-3">
-            <div className="text-sm">{d.label}</div>
+          <div key={d.id} className="grid gap-2 md:grid-cols-[170px_1fr_190px] md:items-center">
+            <div>
+              <div className="text-sm">{d.label}</div>
+              <div className="mt-0.5 font-mono text-[9px] uppercase tracking-[0.18em] text-muted-foreground">
+                {directionHint}
+              </div>
+            </div>
             <div className="relative h-8 rounded-md border hairline bg-background/60">
               <div className="absolute inset-y-0 left-1/2 w-px bg-hairline" />
               <motion.div
@@ -47,7 +74,7 @@ export function ImpactChart({ impact, compareImpact }: Props) {
                 className="absolute top-1/2 h-4 -translate-y-1/2 rounded-sm"
                 style={{
                   left: v >= 0 ? "50%" : `${50 - width}%`,
-                  background: beneficial ? "var(--color-jade)" : "var(--color-coral)",
+                  background: barIsBeneficial ? "var(--color-jade)" : "var(--color-coral)",
                 }}
               />
               {compareImpact !== undefined && cmp !== undefined && (
@@ -63,7 +90,20 @@ export function ImpactChart({ impact, compareImpact }: Props) {
               )}
             </div>
             <div className="text-right text-xs uppercase tracking-wider text-muted-foreground">
-              {isZero ? "Unaffected" : describeImpact(v, d.positiveIsGood)}
+              <div>{isZero ? "Unaffected" : describeImpact(v, d.positiveIsGood)}</div>
+              {change && (
+                <div
+                  className={`mt-1 font-semibold ${
+                    change.improved === null
+                      ? "text-muted-foreground"
+                      : change.improved
+                        ? "text-jade"
+                        : "text-coral"
+                  }`}
+                >
+                  {change.label}
+                </div>
+              )}
             </div>
           </div>
         );
